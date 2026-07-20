@@ -1,0 +1,8 @@
+.git
+.gitignore
+.DS_Store
+data/*.db
+data/*.db-*
+public/uploads/icons/**
+!public/uploads/icons/.gitkeep
+README.md

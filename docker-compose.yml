@@ -1,0 +1,13 @@
+services:
+  portal:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: portal:local
+    container_name: portal
+    ports:
+      - "8080:80"
+    volumes:
+      - ./data:/var/www/html/data
+      - ./public/uploads:/var/www/html/public/uploads
+    restart: unless-stopped
