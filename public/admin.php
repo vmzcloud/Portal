@@ -152,6 +152,36 @@ if ($teamcalLocationsJson === false) {
         <button type="button" class="btn btn-primary" id="teamcalSaveEnabled">Save setting</button>
       </div>
       <hr style="border:0;border-top:1px solid var(--border);margin:8px 0 18px">
+      <h3 style="margin:0 0 10px;font-size:1rem">Period time ranges</h3>
+      <p class="form-hint" style="margin-top:0">Used when an event is All day, AM, or PM. Defaults: All day 09:00–18:00, AM 09:00–13:00, PM 14:00–18:00.</p>
+      <div class="table-wrap" style="margin-bottom:12px">
+        <table class="data" id="teamcalRangesTable">
+          <thead>
+            <tr><th>Mode</th><th>Start</th><th>End</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>All day</td>
+              <td><input class="form-control" type="time" id="rangeAllDayStart" value="09:00"></td>
+              <td><input class="form-control" type="time" id="rangeAllDayEnd" value="18:00"></td>
+            </tr>
+            <tr>
+              <td>AM</td>
+              <td><input class="form-control" type="time" id="rangeAmStart" value="09:00"></td>
+              <td><input class="form-control" type="time" id="rangeAmEnd" value="13:00"></td>
+            </tr>
+            <tr>
+              <td>PM</td>
+              <td><input class="form-control" type="time" id="rangePmStart" value="14:00"></td>
+              <td><input class="form-control" type="time" id="rangePmEnd" value="18:00"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="form-actions" style="justify-content:flex-start;margin-bottom:18px">
+        <button type="button" class="btn btn-primary" id="teamcalSaveRanges">Save period ranges</button>
+      </div>
+      <hr style="border:0;border-top:1px solid var(--border);margin:8px 0 18px">
       <div class="form-row">
         <div class="form-group" style="flex:1">
           <label for="teamcalTypesJson">Event types (JSON array)</label>
@@ -166,6 +196,17 @@ if ($teamcalLocationsJson === false) {
       </div>
       <div class="form-actions" style="justify-content:flex-start">
         <button type="button" class="btn btn-primary" id="teamcalSaveJson">Save types &amp; locations</button>
+      </div>
+      <hr style="border:0;border-top:1px solid var(--border);margin:18px 0">
+      <h3 style="margin:0 0 10px;font-size:1rem">Holidays (ICS)</h3>
+      <p class="form-hint" style="margin-top:0">Upload a holiday calendar (.ics). Dates are marked red on the week view (with Sundays). Replacing uploads overwrite the list.</p>
+      <div class="form-group">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+          <input type="file" id="teamcalHolidayFile" accept=".ics,.ical,text/calendar">
+          <button type="button" class="btn btn-primary" id="teamcalUploadHolidays">Upload holiday ICS</button>
+          <button type="button" class="btn btn-ghost" id="teamcalClearHolidays">Clear holidays</button>
+        </div>
+        <div class="form-hint" id="teamcalHolidayCount">Holidays loaded: —</div>
       </div>
     </section>
   </div>

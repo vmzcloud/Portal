@@ -19,6 +19,7 @@ if ($method === 'GET') {
         'enabled' => TeamCal::isEnabled(),
         'types' => TeamCal::eventTypes(),
         'locations' => TeamCal::locations(),
+        'period_ranges' => TeamCal::periodRanges(),
         'users' => TeamCal::activePortalUsers(),
     ];
 

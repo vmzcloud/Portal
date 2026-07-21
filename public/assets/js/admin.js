@@ -273,12 +273,27 @@
     document.getElementById(id).value = JSON.stringify(value, null, 2);
   }
 
+  function fillPeriodRanges(ranges) {
+    if (!ranges || typeof ranges !== 'object') return;
+    const set = (id, val) => {
+      const el = document.getElementById(id);
+      if (el && val) el.value = String(val).slice(0, 5);
+    };
+    set('rangeAllDayStart', ranges.all_day?.start);
+    set('rangeAllDayEnd', ranges.all_day?.end);
+    set('rangeAmStart', ranges.am?.start);
+    set('rangeAmEnd', ranges.am?.end);
+    set('rangePmStart', ranges.pm?.start);
+    set('rangePmEnd', ranges.pm?.end);
+  }
+
   async function loadTeamCal() {
     const typesEl = document.getElementById('teamcalTypesJson');
     const locsEl = document.getElementById('teamcalLocationsJson');
     try {
       const settings = await api('/api/teamcal/settings.php');
       document.getElementById('teamcalEnabled').checked = !!settings.enabled;
+      fillPeriodRanges(settings.period_ranges);
       if (Array.isArray(settings.types) && settings.types.length) {
         setJsonField('teamcalTypesJson', settings.types);
       }
@@ -303,6 +318,14 @@
         toast(err.message || 'Failed to load types/locations', true);
       }
     }
+    try {
+      const hol = await api('/api/teamcal/holidays.php');
+      const el = document.getElementById('teamcalHolidayCount');
+      if (el) el.textContent = `Holidays loaded: ${hol.count ?? 0}`;
+    } catch {
+      const el = document.getElementById('teamcalHolidayCount');
+      if (el) el.textContent = 'Holidays loaded: —';
+    }
   }
 
   document.getElementById('teamcalSaveEnabled').addEventListener('click', async () => {
@@ -310,6 +333,33 @@
       const enabled = document.getElementById('teamcalEnabled').checked;
       await api('/api/teamcal/settings.php', { method: 'PUT', body: { enabled } });
       toast(enabled ? 'Team Calendar enabled' : 'Team Calendar disabled');
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+
+  document.getElementById('teamcalSaveRanges')?.addEventListener('click', async () => {
+    const period_ranges = {
+      all_day: {
+        start: document.getElementById('rangeAllDayStart').value,
+        end: document.getElementById('rangeAllDayEnd').value,
+      },
+      am: {
+        start: document.getElementById('rangeAmStart').value,
+        end: document.getElementById('rangeAmEnd').value,
+      },
+      pm: {
+        start: document.getElementById('rangePmStart').value,
+        end: document.getElementById('rangePmEnd').value,
+      },
+    };
+    try {
+      const data = await api('/api/teamcal/settings.php', {
+        method: 'PUT',
+        body: { period_ranges },
+      });
+      fillPeriodRanges(data.period_ranges);
+      toast('Period ranges saved');
     } catch (err) {
       toast(err.message, true);
     }
@@ -337,6 +387,40 @@
       document.getElementById('teamcalTypesJson').value = JSON.stringify(data.types || [], null, 2);
       document.getElementById('teamcalLocationsJson').value = JSON.stringify(data.locations || [], null, 2);
       toast('Types & locations saved');
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+
+  document.getElementById('teamcalUploadHolidays')?.addEventListener('click', async () => {
+    const input = document.getElementById('teamcalHolidayFile');
+    const file = input?.files?.[0];
+    if (!file) return toast('Choose an .ics file first', true);
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const res = await fetch('/api/teamcal/holidays.php', {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': csrf },
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok || data.ok === false) throw new Error(data.error || 'Upload failed');
+      const count = data.data?.count ?? 0;
+      document.getElementById('teamcalHolidayCount').textContent = `Holidays loaded: ${count}`;
+      input.value = '';
+      toast(`Loaded ${count} holiday date(s)`);
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+
+  document.getElementById('teamcalClearHolidays')?.addEventListener('click', async () => {
+    if (!confirm('Clear all holiday dates?')) return;
+    try {
+      await api('/api/teamcal/holidays.php', { method: 'DELETE', body: {} });
+      document.getElementById('teamcalHolidayCount').textContent = 'Holidays loaded: 0';
+      toast('Holidays cleared');
     } catch (err) {
       toast(err.message, true);
     }

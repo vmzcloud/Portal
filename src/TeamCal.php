@@ -37,6 +37,121 @@ final class TeamCal
         }
     }
 
+    /** @return array{all_day: array{start: string, end: string}, am: array{start: string, end: string}, pm: array{start: string, end: string}} */
+    public static function defaultPeriodRanges(): array
+    {
+        return [
+            'all_day' => ['start' => '09:00', 'end' => '18:00'],
+            'am' => ['start' => '09:00', 'end' => '13:00'],
+            'pm' => ['start' => '14:00', 'end' => '18:00'],
+        ];
+    }
+
+    /** @return array{all_day: array{start: string, end: string}, am: array{start: string, end: string}, pm: array{start: string, end: string}} */
+    public static function periodRanges(): array
+    {
+        $defaults = self::defaultPeriodRanges();
+        $raw = self::getSetting('period_ranges', '');
+        if ($raw === '') {
+            return $defaults;
+        }
+        $data = json_decode($raw, true);
+        if (!is_array($data)) {
+            return $defaults;
+        }
+        $out = $defaults;
+        foreach (['all_day', 'am', 'pm'] as $key) {
+            if (!isset($data[$key]) || !is_array($data[$key])) {
+                continue;
+            }
+            $start = self::normalizeTimeHm((string) ($data[$key]['start'] ?? ''));
+            $end = self::normalizeTimeHm((string) ($data[$key]['end'] ?? ''));
+            if ($start !== null && $end !== null && strcmp($start, $end) < 0) {
+                $out[$key] = ['start' => $start, 'end' => $end];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * @param array<string, mixed> $ranges
+     * @return array{all_day: array{start: string, end: string}, am: array{start: string, end: string}, pm: array{start: string, end: string}}
+     */
+    public static function setPeriodRanges(array $ranges): array
+    {
+        $normalized = self::defaultPeriodRanges();
+        foreach (['all_day', 'am', 'pm'] as $key) {
+            if (!isset($ranges[$key]) || !is_array($ranges[$key])) {
+                throw new InvalidArgumentException("Missing range for {$key}");
+            }
+            $start = self::normalizeTimeHm((string) ($ranges[$key]['start'] ?? ''));
+            $end = self::normalizeTimeHm((string) ($ranges[$key]['end'] ?? ''));
+            if ($start === null || $end === null) {
+                throw new InvalidArgumentException("Invalid time for {$key} (use HH:MM)");
+            }
+            if (strcmp($start, $end) >= 0) {
+                throw new InvalidArgumentException("Start must be before end for {$key}");
+            }
+            $normalized[$key] = ['start' => $start, 'end' => $end];
+        }
+        $json = json_encode($normalized, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($json === false) {
+            throw new RuntimeException('Failed to encode period ranges');
+        }
+        self::setSetting('period_ranges', $json);
+        return $normalized;
+    }
+
+    public static function normalizeTimeHm(string $value): ?string
+    {
+        $value = trim($value);
+        if (preg_match('/^(\d{1,2}):(\d{2})(?::\d{2})?$/', $value, $m)) {
+            $h = (int) $m[1];
+            $min = (int) $m[2];
+            if ($h < 0 || $h > 23 || $min < 0 || $min > 59) {
+                return null;
+            }
+            return sprintf('%02d:%02d', $h, $min);
+        }
+        return null;
+    }
+
+    /**
+     * Build starts_at / ends_at for all_day, am, or pm using configured ranges.
+     *
+     * @return array{0: string, 1: string} [starts_at, ends_at]
+     */
+    public static function applyPeriodTimes(string $startDay, string $endDay, string $mode): array
+    {
+        $startDay = substr($startDay, 0, 10);
+        $endDay = substr($endDay, 0, 10);
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $startDay)) {
+            throw new InvalidArgumentException('Invalid start day');
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $endDay)) {
+            $endDay = $startDay;
+        }
+        if (strcmp($endDay, $startDay) < 0) {
+            $endDay = $startDay;
+        }
+
+        $ranges = self::periodRanges();
+        $key = $mode === 'all_day' ? 'all_day' : ($mode === 'am' || $mode === 'pm' ? $mode : null);
+        if ($key === null) {
+            throw new InvalidArgumentException('Invalid period mode');
+        }
+        $startHm = $ranges[$key]['start'];
+        $endHm = $ranges[$key]['end'];
+        // am/pm are single-day; all_day may span end day
+        if ($key === 'am' || $key === 'pm') {
+            $endDay = $startDay;
+        }
+        return [
+            $startDay . ' ' . $startHm . ':00',
+            $endDay . ' ' . $endHm . ':00',
+        ];
+    }
+
     public static function readJsonList(string $filename): array
     {
         $path = TeamCalDatabase::configDir() . '/' . $filename;
@@ -92,6 +207,81 @@ final class TeamCal
     public static function locations(): array
     {
         return self::readJsonList('locations.json');
+    }
+
+    /** @return array<string, string> Y-m-d => name */
+    public static function holidays(): array
+    {
+        $path = TeamCalDatabase::configDir() . '/holidays.json';
+        if (!is_file($path)) {
+            return [];
+        }
+        $raw = file_get_contents($path);
+        if ($raw === false || trim($raw) === '') {
+            return [];
+        }
+        $data = json_decode($raw, true);
+        if (!is_array($data)) {
+            return [];
+        }
+        $out = [];
+        foreach ($data as $date => $name) {
+            $d = is_string($date) ? trim($date) : '';
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) {
+                continue;
+            }
+            $n = is_string($name) ? trim($name) : (is_numeric($name) ? (string) $name : '');
+            $out[$d] = $n !== '' ? $n : 'Holiday';
+        }
+        ksort($out);
+        return $out;
+    }
+
+    /** @param array<string, string> $map */
+    public static function writeHolidays(array $map): array
+    {
+        $out = [];
+        foreach ($map as $date => $name) {
+            $d = is_string($date) ? trim($date) : '';
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) {
+                continue;
+            }
+            $n = is_string($name) ? trim($name) : '';
+            $out[$d] = $n !== '' ? $n : 'Holiday';
+        }
+        ksort($out);
+        $path = TeamCalDatabase::configDir() . '/holidays.json';
+        $json = json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($json === false || file_put_contents($path, $json . "\n") === false) {
+            throw new RuntimeException('Failed to write holidays.json');
+        }
+        return $out;
+    }
+
+    /** @return array<string, string> */
+    public static function holidaysInRange(string $fromDate, string $toDate): array
+    {
+        $fromDate = substr($fromDate, 0, 10);
+        $toDate = substr($toDate, 0, 10);
+        $all = self::holidays();
+        $out = [];
+        foreach ($all as $d => $name) {
+            if (strcmp($d, $fromDate) >= 0 && strcmp($d, $toDate) <= 0) {
+                $out[$d] = $name;
+            }
+        }
+        return $out;
+    }
+
+    public static function findEventIdByIcsUid(string $uid): ?int
+    {
+        if ($uid === '') {
+            return null;
+        }
+        $stmt = self::pdo()->prepare('SELECT id FROM events WHERE ics_uid = ? LIMIT 1');
+        $stmt->execute([$uid]);
+        $id = $stmt->fetchColumn();
+        return $id === false ? null : (int) $id;
     }
 
     public static function canViewEvent(array $event, ?array $user, array $userGroupIds): bool

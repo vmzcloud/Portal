@@ -40,18 +40,15 @@ function teamcal_validate_event_payload(array $body, bool $isGuest): array
         json_error('End must be on or after start');
     }
 
-    // Normalize half-day / all-day bounds on the start date
+    // Normalize half-day / all-day bounds using admin-configured ranges
     $startDay = substr($startsAt, 0, 10);
+    $endDay = substr($endsAt, 0, 10);
     if ($allDay) {
-        $startsAt = $startDay . ' 00:00:00';
-        $endDay = substr($endsAt, 0, 10);
-        $endsAt = $endDay . ' 23:59:59';
+        [$startsAt, $endsAt] = TeamCal::applyPeriodTimes($startDay, $endDay, 'all_day');
     } elseif ($period === 'am') {
-        $startsAt = $startDay . ' 00:00:00';
-        $endsAt = $startDay . ' 11:59:59';
+        [$startsAt, $endsAt] = TeamCal::applyPeriodTimes($startDay, $startDay, 'am');
     } elseif ($period === 'pm') {
-        $startsAt = $startDay . ' 12:00:00';
-        $endsAt = $startDay . ' 23:59:59';
+        [$startsAt, $endsAt] = TeamCal::applyPeriodTimes($startDay, $startDay, 'pm');
     }
 
     $visibility = strtolower(trim((string) ($body['visibility'] ?? 'public')));

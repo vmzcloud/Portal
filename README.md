@@ -170,6 +170,14 @@ Optional shared calendar (`/calendar.php`). **Off by default.**
 - Location (dropdown from admin JSON, or free text “Other…”)  
 - Description, start/end, all-day / AM / PM, color  
 - Visibility: public / share / private  
+- **Period ranges** (admin-configurable; defaults below) applied when saving All day / AM / PM:
+
+  | Mode | Default start | Default end |
+  |------|---------------|-------------|
+  | All day | 09:00 | 18:00 |
+  | AM | 09:00 | 13:00 |
+  | PM | 14:00 | 18:00 |
+
 
 **Visibility & who can write**
 
@@ -184,12 +192,23 @@ Edit / delete: **owner** or **admin**. Guest-created public events have no owner
 **Admin config**
 
 - Enable / disable feature  
+- **Period time ranges** for All day / AM / PM  
 - **Event types** JSON array editor → `data/teamcal/event_types.json`  
 - **Locations** JSON array editor → `data/teamcal/locations.json`  
+- **Holiday ICS** upload (Admin or Calendar page) → `data/teamcal/holidays.json`  
+  - Sundays and holiday dates show in **red** on the week view  
+
+**ICS import** (admin only, calendar enabled)
+
+- **Import ICS** on the calendar page → creates public events (`type: Imported`)  
+- Re-import skips events with the same `UID` (`ics_uid`)  
+- Single instances only (RRULE not expanded)  
+- Max file size 2MB  
 
 **Storage**
 
 - Events & settings: `data/teamcal.db` (separate from portal bookmarks DB)  
+- Holidays map: `data/teamcal/holidays.json`  
 - Schema reference: `sql/teamcal_schema.sql`  
 
 ### Authentication
@@ -242,6 +261,7 @@ Edit / delete: **owner** or **admin**. Guest-created public events have no owner
 | `data/teamcal.db` | Team Calendar settings + events |
 | `data/teamcal/event_types.json` | Event type dropdown list |
 | `data/teamcal/locations.json` | Location dropdown list |
+| `data/teamcal/holidays.json` | Holiday dates (from holiday ICS) |
 | `public/uploads/icons/` | Uploaded bookmark icons |
 | `sql/schema.sql` | Portal schema (new installs) |
 | `sql/teamcal_schema.sql` | Team Calendar schema reference |
@@ -264,6 +284,8 @@ Portal/
 │   │   ├── users.php
 │   │   └── teamcal/
 │   │       ├── events.php
+│   │       ├── holidays.php
+│   │       ├── import.php
 │   │       ├── meta.php
 │   │       └── settings.php
 │   ├── assets/css|js/      # style.css, app.js, admin.js, calendar.js
@@ -280,6 +302,7 @@ Portal/
 │   ├── Database.php        # portal.db
 │   ├── TeamCal.php
 │   ├── TeamCalDatabase.php # teamcal.db
+│   ├── IcsParser.php       # .ics import / holidays
 │   ├── helpers.php
 │   └── bootstrap.php
 ├── sql/

@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS events (
     period TEXT NOT NULL DEFAULT 'none' CHECK(period IN ('none', 'am', 'pm')),
     visibility TEXT NOT NULL DEFAULT 'public' CHECK(visibility IN ('public', 'share', 'private')),
     owner_id INTEGER,
+    ics_uid TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -40,3 +41,4 @@ CREATE INDEX IF NOT EXISTS idx_events_starts ON events(starts_at);
 CREATE INDEX IF NOT EXISTS idx_events_ends ON events(ends_at);
 CREATE INDEX IF NOT EXISTS idx_events_visibility ON events(visibility);
 CREATE INDEX IF NOT EXISTS idx_events_owner ON events(owner_id);
+CREATE INDEX IF NOT EXISTS idx_events_ics_uid ON events(ics_uid);

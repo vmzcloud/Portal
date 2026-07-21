@@ -633,10 +633,41 @@ table.data th { color: var(--text-muted); font-weight: 600; }
   border-right: 1px solid var(--border);
   background: rgba(0,0,0,0.15);
   color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
 }
 .cal-day-head:nth-child(7),
 .cal-day-col:nth-child(14) { border-right: 0; }
 .cal-day-head.is-today { color: var(--accent); }
+.cal-day-head.is-sunday,
+.cal-day-head.is-holiday {
+  color: #ef5350;
+  background: rgba(239, 83, 80, 0.1);
+}
+.cal-day-head.is-today.is-sunday,
+.cal-day-head.is-today.is-holiday {
+  color: #ff8a80;
+  box-shadow: inset 0 -2px 0 #ef5350;
+}
+.cal-day-head-main { line-height: 1.2; }
+.cal-day-head-holiday {
+  font-size: 0.65rem;
+  font-weight: 500;
+  line-height: 1.15;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.95;
+}
+.cal-day-col.is-sunday,
+.cal-day-col.is-holiday {
+  background: rgba(239, 83, 80, 0.03);
+}
 .cal-day-col {
   grid-row: 2;
   min-height: 280px;

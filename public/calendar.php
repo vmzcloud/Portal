@@ -38,10 +38,14 @@ $isAdmin = Auth::isAdmin();
     <div class="header-actions">
       <a class="btn btn-sm" href="/">Portal</a>
       <button type="button" class="btn btn-sm btn-primary" id="btnNewEvent">+ Event</button>
+      <?php if ($isAdmin): ?>
+        <button type="button" class="btn btn-sm" id="btnImportIcs">Import ICS</button>
+        <button type="button" class="btn btn-sm" id="btnImportHolidays">Holiday ICS</button>
+        <input type="file" id="icsFileInput" accept=".ics,.ical,text/calendar" class="hidden">
+        <input type="file" id="holidayFileInput" accept=".ics,.ical,text/calendar" class="hidden">
+        <a class="btn btn-sm" href="/admin.php">Admin</a>
+      <?php endif; ?>
       <?php if ($user): ?>
-        <?php if ($isAdmin): ?>
-          <a class="btn btn-sm" href="/admin.php">Admin</a>
-        <?php endif; ?>
         <span class="user-chip"><?= e($user['username']) ?></span>
         <form method="post" action="/logout.php" style="display:inline">
           <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
@@ -62,7 +66,7 @@ $isAdmin = Auth::isAdmin();
       </div>
       <h1 class="cal-week-label" id="calWeekLabel">Week</h1>
       <div class="cal-toolbar-right">
-        <span class="cal-hint">Week starts Sunday</span>
+        <span class="cal-hint">Week starts Sunday · Sundays &amp; holidays in red</span>
       </div>
     </div>
     <div class="cal-week" id="calWeek"></div>

@@ -107,6 +107,13 @@ final class TeamCalDatabase
         self::$pdo->exec('CREATE INDEX IF NOT EXISTS idx_events_visibility ON events(visibility)');
         self::$pdo->exec('CREATE INDEX IF NOT EXISTS idx_events_owner ON events(owner_id)');
 
+        $cols = self::$pdo->query('PRAGMA table_info(events)')->fetchAll();
+        $names = array_map(static fn ($c) => $c['name'], $cols);
+        if (!in_array('ics_uid', $names, true)) {
+            self::$pdo->exec('ALTER TABLE events ADD COLUMN ics_uid TEXT');
+        }
+        self::$pdo->exec('CREATE INDEX IF NOT EXISTS idx_events_ics_uid ON events(ics_uid)');
+
         $stmt = self::$pdo->prepare('SELECT value FROM settings WHERE key = ?');
         $stmt->execute(['enabled']);
         if ($stmt->fetchColumn() === false) {
@@ -135,6 +142,10 @@ final class TeamCalDatabase
                 $locPath,
                 json_encode(['Office', 'Remote', 'Room A', 'Room B'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n"
             );
+        }
+        $holPath = $configDir . '/holidays.json';
+        if (!is_file($holPath)) {
+            file_put_contents($holPath, "{}\n");
         }
     }
 }

@@ -1,12 +1,15 @@
 (() => {
   const csrf = document.body.dataset.csrf || '';
   const isAuth = document.body.dataset.auth === '1';
+  const isAdmin = document.body.dataset.admin === '1';
   const toastEl = document.getElementById('toast');
 
   const HOUR_START = 9;
 
   let meta = { types: [], locations: [], users: [], groups: [] };
   let events = [];
+  /** @type {Record<string, string>} */
+  let holidays = {};
   let weekStart = startOfWeek(new Date()); // Sunday
 
   function toast(msg, isError = false) {
@@ -77,6 +80,10 @@
   function fmtDayHeader(d) {
     const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     return `${names[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}`;
+  }
+
+  function ymd(d) {
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   }
 
   function fmtWeekLabel(start) {
@@ -267,18 +274,20 @@
     let starts_at;
     let ends_at;
 
+    // Server applies admin-configured ranges for all_day / am / pm
     if (mode === 'all_day') {
       all_day = true;
+      const endDate = (endVal || startVal).slice(0, 10);
       starts_at = `${startDate} 00:00:00`;
-      ends_at = `${(endVal || startVal).slice(0, 10)} 23:59:59`;
+      ends_at = `${endDate} 00:00:00`;
     } else if (mode === 'am') {
       period = 'am';
       starts_at = `${startDate} 00:00:00`;
-      ends_at = `${startDate} 11:59:59`;
+      ends_at = `${startDate} 00:00:00`;
     } else if (mode === 'pm') {
       period = 'pm';
-      starts_at = `${startDate} 12:00:00`;
-      ends_at = `${startDate} 23:59:59`;
+      starts_at = `${startDate} 00:00:00`;
+      ends_at = `${startDate} 00:00:00`;
     } else {
       if (!endVal) endVal = startVal;
       starts_at = toApiDatetime(startVal);
@@ -348,6 +357,70 @@
     events = await api(`/api/teamcal/events.php?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
   }
 
+  async function loadHolidays() {
+    const from = ymd(weekStart);
+    const to = ymd(addDays(weekStart, 6));
+    try {
+      const data = await api(
+        `/api/teamcal/holidays.php?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+      );
+      holidays = data.holidays || {};
+    } catch {
+      holidays = {};
+    }
+  }
+
+  async function uploadIcs(url, file) {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'X-CSRF-Token': csrf },
+      body: fd,
+    });
+    const data = await res.json();
+    if (!res.ok || data.ok === false) throw new Error(data.error || 'Upload failed');
+    return data.data;
+  }
+
+  if (isAdmin) {
+    const icsInput = document.getElementById('icsFileInput');
+    const holInput = document.getElementById('holidayFileInput');
+    document.getElementById('btnImportIcs')?.addEventListener('click', () => icsInput?.click());
+    document.getElementById('btnImportHolidays')?.addEventListener('click', () => holInput?.click());
+
+    icsInput?.addEventListener('change', async () => {
+      const file = icsInput.files?.[0];
+      icsInput.value = '';
+      if (!file) return;
+      try {
+        const result = await uploadIcs('/api/teamcal/import.php', file);
+        const parts = [`Imported ${result.imported || 0}`];
+        if (result.skipped) parts.push(`skipped ${result.skipped}`);
+        if ((result.errors || []).length) parts.push(`${result.errors.length} errors`);
+        toast(parts.join(', '));
+        await loadEvents();
+        renderWeek();
+      } catch (err) {
+        toast(err.message, true);
+      }
+    });
+
+    holInput?.addEventListener('change', async () => {
+      const file = holInput.files?.[0];
+      holInput.value = '';
+      if (!file) return;
+      try {
+        const result = await uploadIcs('/api/teamcal/holidays.php', file);
+        toast(`Loaded ${result.count || 0} holiday date(s)`);
+        await loadHolidays();
+        renderWeek();
+      } catch (err) {
+        toast(err.message, true);
+      }
+    });
+  }
+
   function eventOverlapsDay(ev, day) {
     const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, 0, 0);
     const dayEnd = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1, 0, 0, 0);
@@ -401,7 +474,19 @@
     days.forEach((d) => {
       const today = new Date();
       const isToday = d.toDateString() === today.toDateString();
-      html += `<div class="cal-day-head${isToday ? ' is-today' : ''}">${esc(fmtDayHeader(d))}</div>`;
+      const isSunday = d.getDay() === 0;
+      const dateKey = ymd(d);
+      const holidayName = holidays[dateKey] || '';
+      const isHoliday = !!holidayName;
+      const classes = ['cal-day-head'];
+      if (isToday) classes.push('is-today');
+      if (isSunday) classes.push('is-sunday');
+      if (isHoliday) classes.push('is-holiday');
+      const tip = holidayName || (isSunday ? 'Sunday' : '');
+      html += `<div class="${classes.join(' ')}"${tip ? ` title="${esc(tip)}"` : ''}>
+        <span class="cal-day-head-main">${esc(fmtDayHeader(d))}</span>
+        ${holidayName ? `<span class="cal-day-head-holiday">${esc(holidayName)}</span>` : ''}
+      </div>`;
     });
 
     days.forEach((d, di) => {
@@ -410,7 +495,11 @@
         .slice()
         .sort((a, b) => String(a.starts_at).localeCompare(String(b.starts_at)));
 
-      html += `<div class="cal-day-col" data-day="${di}">`;
+      const dateKey = ymd(d);
+      const colClasses = ['cal-day-col'];
+      if (d.getDay() === 0) colClasses.push('is-sunday');
+      if (holidays[dateKey]) colClasses.push('is-holiday');
+      html += `<div class="${colClasses.join(' ')}" data-day="${di}">`;
       dayEvents.forEach((ev) => {
         html += renderEventChip(ev);
       });
@@ -440,27 +529,28 @@
     });
   }
 
+  async function reloadWeek() {
+    await Promise.all([loadEvents(), loadHolidays()]);
+    renderWeek();
+  }
+
   document.getElementById('calPrev').addEventListener('click', async () => {
     weekStart = addDays(weekStart, -7);
-    await loadEvents();
-    renderWeek();
+    await reloadWeek();
   });
   document.getElementById('calNext').addEventListener('click', async () => {
     weekStart = addDays(weekStart, 7);
-    await loadEvents();
-    renderWeek();
+    await reloadWeek();
   });
   document.getElementById('calToday').addEventListener('click', async () => {
     weekStart = startOfWeek(new Date());
-    await loadEvents();
-    renderWeek();
+    await reloadWeek();
   });
 
   async function init() {
     try {
       await loadMeta();
-      await loadEvents();
-      renderWeek();
+      await reloadWeek();
     } catch (err) {
       toast(err.message, true);
     }
