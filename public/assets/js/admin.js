@@ -39,8 +39,11 @@
     btn.addEventListener('click', () => {
       document.querySelectorAll('[data-panel]').forEach((b) => b.classList.remove('btn-primary'));
       btn.classList.add('btn-primary');
-      document.getElementById('panel-users').classList.toggle('hidden', btn.dataset.panel !== 'users');
-      document.getElementById('panel-groups').classList.toggle('hidden', btn.dataset.panel !== 'groups');
+      const panel = btn.dataset.panel;
+      document.getElementById('panel-users').classList.toggle('hidden', panel !== 'users');
+      document.getElementById('panel-groups').classList.toggle('hidden', panel !== 'groups');
+      document.getElementById('panel-teamcal').classList.toggle('hidden', panel !== 'teamcal');
+      if (panel === 'teamcal') loadTeamCal().catch((err) => toast(err.message, true));
     });
   });
 
@@ -260,6 +263,80 @@
       }
       resetGroupForm();
       await loadGroups();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+
+  function setJsonField(id, value) {
+    if (!Array.isArray(value)) return;
+    document.getElementById(id).value = JSON.stringify(value, null, 2);
+  }
+
+  async function loadTeamCal() {
+    const typesEl = document.getElementById('teamcalTypesJson');
+    const locsEl = document.getElementById('teamcalLocationsJson');
+    try {
+      const settings = await api('/api/teamcal/settings.php');
+      document.getElementById('teamcalEnabled').checked = !!settings.enabled;
+      if (Array.isArray(settings.types) && settings.types.length) {
+        setJsonField('teamcalTypesJson', settings.types);
+      }
+      if (Array.isArray(settings.locations) && settings.locations.length) {
+        setJsonField('teamcalLocationsJson', settings.locations);
+      }
+    } catch (err) {
+      toast(err.message || 'Failed to load Team Calendar settings', true);
+      return;
+    }
+    try {
+      const meta = await api('/api/teamcal/meta.php');
+      if (Array.isArray(meta.types) && meta.types.length) {
+        setJsonField('teamcalTypesJson', meta.types);
+      }
+      if (Array.isArray(meta.locations) && meta.locations.length) {
+        setJsonField('teamcalLocationsJson', meta.locations);
+      }
+    } catch (err) {
+      // Keep SSR / settings values; only toast if fields are still empty
+      if (!String(typesEl.value || '').trim() || !String(locsEl.value || '').trim()) {
+        toast(err.message || 'Failed to load types/locations', true);
+      }
+    }
+  }
+
+  document.getElementById('teamcalSaveEnabled').addEventListener('click', async () => {
+    try {
+      const enabled = document.getElementById('teamcalEnabled').checked;
+      await api('/api/teamcal/settings.php', { method: 'PUT', body: { enabled } });
+      toast(enabled ? 'Team Calendar enabled' : 'Team Calendar disabled');
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+
+  document.getElementById('teamcalSaveJson').addEventListener('click', async () => {
+    let types;
+    let locations;
+    try {
+      types = JSON.parse(document.getElementById('teamcalTypesJson').value);
+      locations = JSON.parse(document.getElementById('teamcalLocationsJson').value);
+    } catch {
+      toast('Invalid JSON', true);
+      return;
+    }
+    if (!Array.isArray(types) || !Array.isArray(locations)) {
+      toast('types and locations must be JSON arrays', true);
+      return;
+    }
+    try {
+      const data = await api('/api/teamcal/meta.php', {
+        method: 'PUT',
+        body: { types, locations },
+      });
+      document.getElementById('teamcalTypesJson').value = JSON.stringify(data.types || [], null, 2);
+      document.getElementById('teamcalLocationsJson').value = JSON.stringify(data.locations || [], null, 2);
+      toast('Types & locations saved');
     } catch (err) {
       toast(err.message, true);
     }

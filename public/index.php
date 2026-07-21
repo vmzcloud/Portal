@@ -11,6 +11,8 @@ if ($user && Auth::mustChangePassword()) {
 }
 $csrf = Auth::csrfToken();
 $isAdmin = Auth::isAdmin();
+TeamCalDatabase::connection();
+$teamcalEnabled = TeamCal::isEnabled();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -18,7 +20,7 @@ $isAdmin = Auth::isAdmin();
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Portal</title>
-  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="<?= e(asset_url('assets/css/style.css')) ?>">
 </head>
 <body
   data-csrf="<?= e($csrf) ?>"
@@ -30,6 +32,9 @@ $isAdmin = Auth::isAdmin();
     <div class="brand">PORTAL</div>
     <nav class="tabs" id="tabsNav" aria-label="Tabs"></nav>
     <div class="header-actions">
+      <?php if ($teamcalEnabled): ?>
+        <a class="btn btn-sm" href="/calendar.php">Calendar</a>
+      <?php endif; ?>
       <?php if ($user): ?>
         <button type="button" class="btn btn-sm" id="btnAddBookmark">+ Bookmark</button>
         <button type="button" class="btn btn-sm" id="btnManage">Manage</button>
@@ -201,6 +206,6 @@ $isAdmin = Auth::isAdmin();
 
   <div class="category-picker" id="categoryPicker" role="menu" aria-label="Choose category"></div>
   <div class="toast" id="toast"></div>
-  <script src="/assets/js/app.js"></script>
+  <script src="<?= e(asset_url('assets/js/app.js')) ?>"></script>
 </body>
 </html>

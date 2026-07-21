@@ -74,6 +74,15 @@ function public_url_path(string $relative): string
     return '/' . ltrim(str_replace('\\', '/', $relative), '/');
 }
 
+/** Cache-busted public asset URL, e.g. asset_url('assets/js/admin.js') */
+function asset_url(string $relative): string
+{
+    $relative = ltrim(str_replace('\\', '/', $relative), '/');
+    $path = base_path('public/' . $relative);
+    $version = is_file($path) ? (string) filemtime($path) : (string) time();
+    return '/' . $relative . '?v=' . rawurlencode($version);
+}
+
 function can_view_bookmark(array $bookmark, ?array $user, array $userGroupIds): bool
 {
     $visibility = $bookmark['visibility'];

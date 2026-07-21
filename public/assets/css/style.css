@@ -577,6 +577,147 @@ table.data th { color: var(--text-muted); font-weight: 600; }
   padding: 8px;
 }
 
+/* Team Calendar */
+.cal-main {
+  width: 95%;
+  max-width: none;
+  margin: 0 auto;
+  padding: 18px 0 48px;
+}
+.cal-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.cal-toolbar-left, .cal-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 140px;
+}
+.cal-toolbar-right { justify-content: flex-end; }
+.cal-week-label {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  text-align: center;
+  flex: 1;
+}
+.cal-hint {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+.cal-week {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: auto;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.2);
+}
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(110px, 1fr));
+  grid-template-rows: auto minmax(280px, 1fr);
+  min-width: 770px;
+}
+.cal-day-head {
+  grid-row: 1;
+  padding: 10px 8px;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  background: rgba(0,0,0,0.15);
+  color: var(--text-muted);
+}
+.cal-day-head:nth-child(7),
+.cal-day-col:nth-child(14) { border-right: 0; }
+.cal-day-head.is-today { color: var(--accent); }
+.cal-day-col {
+  grid-row: 2;
+  min-height: 280px;
+  padding: 6px;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-content: flex-start;
+  cursor: pointer;
+  overflow-y: auto;
+}
+.cal-day-col:hover { background: rgba(79, 195, 247, 0.04); }
+.cal-chip {
+  border: 0;
+  border-left: 3px solid var(--ev, var(--accent));
+  background: color-mix(in srgb, var(--ev, var(--accent)) 22%, #161d27);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 7px 8px;
+  text-align: left;
+  font-size: 0.78rem;
+  line-height: 1.3;
+  cursor: pointer;
+  flex-shrink: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cal-chip:hover { filter: brightness(1.1); }
+.cal-chip-type {
+  display: block;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cal-chip-title {
+  display: block;
+  font-weight: 600;
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cal-chip-meta,
+.cal-chip-people {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cal-chip-people {
+  color: #9fb3c8;
+}
+.cal-modal { width: min(560px, 100%); }
+.cal-time-mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+.cal-time-mode label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  cursor: pointer;
+}
+.cal-people-list {
+  max-height: 140px;
+  overflow: auto;
+}
+
 @media (max-width: 720px) {
   .app-header { padding: 0 12px; gap: 8px; }
   .brand { display: none; }
@@ -585,4 +726,6 @@ table.data th { color: var(--text-muted); font-weight: 600; }
   .form-row { grid-template-columns: 1fr; }
   .footer-bar { gap: 14px; font-size: 0.8rem; }
   .category-meta { opacity: 1; }
+  .cal-main { width: 95%; padding-top: 12px; }
+  .cal-toolbar-right { display: none; }
 }
