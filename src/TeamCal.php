@@ -364,6 +364,133 @@ final class TeamCal
         }
     }
 
+    /**
+     * Admin event list with filters. Returns ['events' => ..., 'truncated' => bool, 'count' => int].
+     *
+     * @param array{
+     *   from?: string|null,
+     *   to?: string|null,
+     *   q?: string|null,
+     *   type?: string|null,
+     *   location?: string|null,
+     *   visibility?: string|null,
+     *   color?: string|null,
+     *   time_mode?: string|null,
+     *   owner_id?: int|null,
+     *   person_id?: int|null,
+     *   group_id?: int|null,
+     *   limit?: int
+     * } $filters
+     * @return array{events: list<array>, truncated: bool, count: int}
+     */
+    public static function listEventsForAdmin(array $filters): array
+    {
+        $from = self::normalizeDatetime((string) ($filters['from'] ?? ''));
+        $to = self::normalizeDatetime((string) ($filters['to'] ?? ''));
+        if (!$from || !$to) {
+            throw new InvalidArgumentException('from and to are required');
+        }
+
+        $limit = (int) ($filters['limit'] ?? 500);
+        if ($limit < 1) {
+            $limit = 500;
+        }
+        if ($limit > 1000) {
+            $limit = 1000;
+        }
+
+        $where = ['e.starts_at <= ?', 'e.ends_at >= ?'];
+        $params = [$to, $from];
+
+        $q = trim((string) ($filters['q'] ?? ''));
+        if ($q !== '') {
+            $where[] = '(e.title LIKE ? OR e.description LIKE ? OR e.location LIKE ?)';
+            $like = '%' . $q . '%';
+            $params[] = $like;
+            $params[] = $like;
+            $params[] = $like;
+        }
+
+        $type = trim((string) ($filters['type'] ?? ''));
+        if ($type !== '') {
+            $where[] = 'e.type = ?';
+            $params[] = $type;
+        }
+
+        $location = trim((string) ($filters['location'] ?? ''));
+        if ($location !== '') {
+            $where[] = 'e.location = ?';
+            $params[] = $location;
+        }
+
+        $visibility = strtolower(trim((string) ($filters['visibility'] ?? '')));
+        if (in_array($visibility, ['public', 'share', 'private'], true)) {
+            $where[] = 'e.visibility = ?';
+            $params[] = $visibility;
+        }
+
+        $color = trim((string) ($filters['color'] ?? ''));
+        if ($color !== '' && preg_match('/^#[0-9A-Fa-f]{6}$/', $color)) {
+            $where[] = 'lower(e.color) = ?';
+            $params[] = strtolower($color);
+        }
+
+        $timeMode = strtolower(trim((string) ($filters['time_mode'] ?? '')));
+        if ($timeMode === 'all_day') {
+            $where[] = 'e.all_day = 1';
+        } elseif ($timeMode === 'am') {
+            $where[] = "e.all_day = 0 AND e.period = 'am'";
+        } elseif ($timeMode === 'pm') {
+            $where[] = "e.all_day = 0 AND e.period = 'pm'";
+        } elseif ($timeMode === 'timed') {
+            $where[] = "e.all_day = 0 AND e.period = 'none'";
+        }
+
+        $ownerId = (int) ($filters['owner_id'] ?? 0);
+        if ($ownerId > 0) {
+            $where[] = 'e.owner_id = ?';
+            $params[] = $ownerId;
+        }
+
+        $personId = (int) ($filters['person_id'] ?? 0);
+        if ($personId > 0) {
+            $where[] = 'EXISTS (SELECT 1 FROM event_persons ep WHERE ep.event_id = e.id AND ep.user_id = ?)';
+            $params[] = $personId;
+        }
+
+        $groupId = (int) ($filters['group_id'] ?? 0);
+        if ($groupId > 0) {
+            $where[] = 'EXISTS (SELECT 1 FROM event_groups eg WHERE eg.event_id = e.id AND eg.group_id = ?)';
+            $params[] = $groupId;
+        }
+
+        $sql = 'SELECT e.* FROM events e WHERE ' . implode(' AND ', $where)
+            . ' ORDER BY e.starts_at ASC, e.id ASC LIMIT ' . ($limit + 1);
+
+        $stmt = self::pdo()->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll();
+
+        $truncated = count($rows) > $limit;
+        if ($truncated) {
+            $rows = array_slice($rows, 0, $limit);
+        }
+
+        $userMap = self::portalUserMap();
+        $events = [];
+        foreach ($rows as $row) {
+            $event = self::enrichEvent($row, $userMap);
+            $event['can_edit'] = true;
+            $events[] = $event;
+        }
+
+        return [
+            'events' => $events,
+            'truncated' => $truncated,
+            'count' => count($events),
+        ];
+    }
+
     public static function loadEvent(int $id): ?array
     {
         $stmt = self::pdo()->prepare('SELECT * FROM events WHERE id = ?');

@@ -158,6 +158,7 @@ Optional shared calendar (`/calendar.php`). **Off by default.**
 
 - Default **week view**, week starts **Sunday**  
 - Main area uses **~95%** of browser width  
+- Toolbar: previous / next week, **This week**, and **Go to date** (date picker jumps to that week)  
 - Day columns list event chips (no hour timeline)  
 - Each chip shows: **type**, **title**, **start** (or All day / AM / PM), **location** (if set), **people** (if set)  
 - Click empty day → create; click event → edit  
@@ -168,7 +169,8 @@ Optional shared calendar (`/calendar.php`). **Off by default.**
 - Title  
 - People (multi-select from portal users)  
 - Location (dropdown from admin JSON, or free text “Other…”)  
-- Description, start/end, all-day / AM / PM, color  
+- Description, start/end, all-day / AM / PM  
+- **Color:** 7 fixed swatches (not a free color picker); changeable on create and edit  
 - Visibility: public / share / private  
 - **Period ranges** (admin-configurable; defaults below) applied when saving All day / AM / PM:
 
@@ -223,10 +225,19 @@ Edit / delete: **owner** or **admin**. Guest-created public events have no owner
 
 ### Admin (`/admin.php`)
 
-- User management: create, delete, reset password, activate/deactivate, force password change  
-- Group management: create/edit/delete groups, assign members (for **share** bookmarks / events)  
-- **Team Calendar**: enable toggle + types/locations JSON editors  
-- Admin cannot deactivate or delete their own account  
+- **Users:** create, delete, reset password, activate/deactivate, force password change, **change role** (`user` ↔ `admin`)  
+  - Cannot demote, deactivate, or delete your own admin account  
+  - Role changes apply after the target user logs in again  
+- **Groups:** create/edit/delete groups, assign members (for **share** bookmarks / events)  
+- **Events** (Team Calendar list management — admin only):  
+  - Table of events with **Edit** / **Delete** and **+ Event** (same modal form as the week view)  
+  - **Search** across title, description, location  
+  - **Filters:** date range, type, location, visibility, time mode, color, owner, person, group  
+  - Default date range: start of current month → end of month +3  
+  - Results capped at **500** (narrow filters if truncated)  
+  - Admins can list/manage events even when Team Calendar is disabled  
+- **Team Calendar** settings: enable toggle, period ranges, types/locations JSON editors, holiday ICS  
+
 
 ### UI chrome
 
@@ -245,12 +256,13 @@ Edit / delete: **owner** or **admin**. Guest-created public events have no owner
 | Edit others’ bookmarks | — | — | ✓ |
 | Personal tabs/categories | — | ✓ | ✓ |
 | Global tabs/categories | — | — | ✓ |
-| Users & groups | — | — | ✓ |
+| Users & groups (incl. change role) | — | — | ✓ |
 | Open Team Calendar (when enabled) | ✓ | ✓ | ✓ |
 | Create public calendar events | ✓ | ✓ | ✓ |
 | Create share/private calendar events | — | ✓ | ✓ |
 | Edit/delete own calendar events | — | ✓ | ✓ |
 | Edit/delete any calendar event | — | — | ✓ |
+| Admin event list (search / filter / manage) | — | — | ✓ |
 | Enable Team Calendar / edit type & location lists | — | — | ✓ |
 
 ## Data & files

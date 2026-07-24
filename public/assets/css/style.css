@@ -455,6 +455,56 @@ img { display: block; max-width: 100%; }
   margin: 0 0 14px;
   font-size: 1.1rem;
 }
+.admin-events-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.admin-event-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px 12px;
+  margin-bottom: 12px;
+  padding: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.admin-event-filters .form-group {
+  margin: 0;
+}
+.admin-event-filters .form-group label {
+  font-size: 0.78rem;
+}
+.admin-event-filter-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.admin-event-meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 10px;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  flex-wrap: wrap;
+}
+.admin-events-table td,
+.admin-events-table th {
+  font-size: 0.85rem;
+}
+.admin-ev-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+  vertical-align: middle;
+}
 .table-wrap { overflow: auto; }
 table.data {
   width: 100%;

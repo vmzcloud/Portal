@@ -95,6 +95,30 @@ function teamcal_validate_event_payload(array $body, bool $isGuest): array
 }
 
 if ($method === 'GET') {
+    $adminList = isset($_GET['admin']) && (string) $_GET['admin'] === '1';
+    if ($adminList) {
+        Auth::requireAdmin();
+        try {
+            $result = TeamCal::listEventsForAdmin([
+                'from' => $_GET['from'] ?? null,
+                'to' => $_GET['to'] ?? null,
+                'q' => $_GET['q'] ?? null,
+                'type' => $_GET['type'] ?? null,
+                'location' => $_GET['location'] ?? null,
+                'visibility' => $_GET['visibility'] ?? null,
+                'color' => $_GET['color'] ?? null,
+                'time_mode' => $_GET['time_mode'] ?? null,
+                'owner_id' => isset($_GET['owner_id']) ? (int) $_GET['owner_id'] : null,
+                'person_id' => isset($_GET['person_id']) ? (int) $_GET['person_id'] : null,
+                'group_id' => isset($_GET['group_id']) ? (int) $_GET['group_id'] : null,
+                'limit' => isset($_GET['limit']) ? (int) $_GET['limit'] : 500,
+            ]);
+        } catch (InvalidArgumentException $e) {
+            json_error($e->getMessage());
+        }
+        json_ok($result);
+    }
+
     TeamCal::requireEnabled();
     $user = Auth::user();
     $userGroupIds = $user ? Auth::userGroupIds((int) $user['id']) : [];
@@ -128,9 +152,12 @@ if ($method === 'GET') {
 
 if ($method === 'POST' || $method === 'PUT' || $method === 'PATCH' || $method === 'DELETE') {
     require_csrf();
-    TeamCal::requireEnabled();
     $body = request_json();
     $user = Auth::user();
+    // Admins may manage events even when calendar is disabled (admin Events panel)
+    if (!($user && ($user['role'] ?? '') === 'admin')) {
+        TeamCal::requireEnabled();
+    }
     // Guests may create public events; mutations otherwise need a usable session when editing
     if ($method !== 'POST' && (!$user || Auth::mustChangePassword())) {
         if (!$user) {

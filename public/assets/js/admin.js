@@ -42,13 +42,498 @@
       const panel = btn.dataset.panel;
       document.getElementById('panel-users').classList.toggle('hidden', panel !== 'users');
       document.getElementById('panel-groups').classList.toggle('hidden', panel !== 'groups');
+      document.getElementById('panel-events')?.classList.toggle('hidden', panel !== 'events');
       document.getElementById('panel-teamcal').classList.toggle('hidden', panel !== 'teamcal');
       if (panel === 'teamcal') loadTeamCal().catch((err) => toast(err.message, true));
+      if (panel === 'events') loadAdminEventsPanel().catch((err) => toast(err.message, true));
     });
   });
 
   let users = [];
   let groups = [];
+  let calMeta = { types: [], locations: [], users: [], groups: [] };
+  let adminEvents = [];
+  let adminEventsReady = false;
+
+  const EVENT_COLORS = [
+    '#4fc3f7', '#ab47bc', '#ef5350', '#66bb6a', '#ffa726', '#26c6da', '#ec407a',
+  ];
+  const HOUR_START = 9;
+
+  function pad(n) {
+    return String(n).padStart(2, '0');
+  }
+
+  function ymd(d) {
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+
+  function toLocalInputValue(date) {
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
+  function toApiDatetime(localValue) {
+    if (!localValue) return '';
+    return localValue.replace('T', ' ') + (localValue.length === 16 ? ':00' : '');
+  }
+
+  function parseApiDatetime(s) {
+    const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+    if (!m) return new Date();
+    return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
+  }
+
+  function defaultEventRange() {
+    const now = new Date();
+    const from = new Date(now.getFullYear(), now.getMonth(), 1);
+    const to = new Date(now.getFullYear(), now.getMonth() + 3, 0);
+    return { from: ymd(from), to: ymd(to) };
+  }
+
+  function fillSelect(el, items, { valueKey = null, labelKey = null, allLabel = 'All' } = {}) {
+    if (!el) return;
+    const opts = [`<option value="">${esc(allLabel)}</option>`];
+    (items || []).forEach((item) => {
+      if (valueKey) {
+        opts.push(`<option value="${esc(item[valueKey])}">${esc(item[labelKey || valueKey])}</option>`);
+      } else {
+        opts.push(`<option value="${esc(item)}">${esc(item)}</option>`);
+      }
+    });
+    el.innerHTML = opts.join('');
+  }
+
+  async function ensureCalMeta() {
+    if (adminEventsReady) return calMeta;
+    calMeta = await api('/api/teamcal/meta.php');
+    fillSelect(document.getElementById('aevType'), calMeta.types || []);
+    fillSelect(document.getElementById('aevLocation'), calMeta.locations || []);
+    fillSelect(document.getElementById('aevOwner'), calMeta.users || [], { valueKey: 'id', labelKey: 'username' });
+    fillSelect(document.getElementById('aevPerson'), calMeta.users || [], { valueKey: 'id', labelKey: 'username' });
+    fillSelect(document.getElementById('aevGroup'), calMeta.groups || [], { valueKey: 'id', labelKey: 'name' });
+    adminEventsReady = true;
+    return calMeta;
+  }
+
+  function openEventModal() {
+    document.getElementById('eventModal').classList.add('open');
+  }
+
+  function closeEventModal() {
+    document.getElementById('eventModal').classList.remove('open');
+  }
+
+  document.querySelectorAll('[data-close-modal]').forEach((btn) => {
+    btn.addEventListener('click', closeEventModal);
+  });
+  document.getElementById('eventModal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'eventModal') closeEventModal();
+  });
+
+  function fillMetaControls(selectedLocation = '', selectedPeople = [], selectedGroups = []) {
+    const typeSel = document.getElementById('evType');
+    const types = (calMeta.types && calMeta.types.length) ? calMeta.types : ['Other'];
+    typeSel.innerHTML = types.map((t) => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+
+    const locSel = document.getElementById('evLocationSelect');
+    const locs = calMeta.locations || [];
+    const inList = locs.includes(selectedLocation);
+    locSel.innerHTML = [
+      '<option value="">—</option>',
+      ...locs.map((l) => `<option value="${esc(l)}">${esc(l)}</option>`),
+      '<option value="__custom__">Other…</option>',
+    ].join('');
+    const custom = document.getElementById('evLocationCustom');
+    if (selectedLocation && !inList) {
+      locSel.value = '__custom__';
+      custom.classList.remove('hidden');
+      custom.value = selectedLocation;
+    } else {
+      locSel.value = selectedLocation || '';
+      custom.classList.add('hidden');
+      custom.value = '';
+    }
+
+    const peopleBox = document.getElementById('evPeople');
+    peopleBox.innerHTML = (calMeta.users || []).map((u) => `
+      <label>
+        <input type="checkbox" value="${u.id}" ${selectedPeople.map(String).includes(String(u.id)) ? 'checked' : ''}>
+        ${esc(u.username)}
+      </label>
+    `).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No users</div>';
+
+    const groupsBox = document.getElementById('evGroups');
+    groupsBox.innerHTML = (calMeta.groups || []).map((g) => `
+      <label>
+        <input type="checkbox" value="${g.id}" ${selectedGroups.map(String).includes(String(g.id)) ? 'checked' : ''}>
+        ${esc(g.name)}
+      </label>
+    `).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No groups</div>';
+  }
+
+  document.getElementById('evLocationSelect')?.addEventListener('change', () => {
+    const custom = document.getElementById('evLocationCustom');
+    const isCustom = document.getElementById('evLocationSelect').value === '__custom__';
+    custom.classList.toggle('hidden', !isCustom);
+    if (isCustom) custom.focus();
+  });
+
+  document.getElementById('evVisibility')?.addEventListener('change', () => {
+    const share = document.getElementById('evVisibility').value === 'share';
+    document.getElementById('evGroupsWrap').classList.toggle('hidden', !share);
+  });
+
+  function getTimeMode() {
+    return document.querySelector('input[name="evTimeMode"]:checked')?.value || 'timed';
+  }
+
+  function setTimeMode(mode) {
+    document.querySelectorAll('input[name="evTimeMode"]').forEach((r) => {
+      r.checked = r.value === mode;
+    });
+    syncTimeInputsDisabled();
+  }
+
+  function syncTimeInputsDisabled() {
+    const mode = getTimeMode();
+    const start = document.getElementById('evStart');
+    const end = document.getElementById('evEnd');
+    if (!start || !end) return;
+    start.disabled = false;
+    end.disabled = mode !== 'timed';
+  }
+
+  document.querySelectorAll('input[name="evTimeMode"]').forEach((r) => {
+    r.addEventListener('change', syncTimeInputsDisabled);
+  });
+
+  function normalizeHexColor(c) {
+    const s = String(c || '').trim().toLowerCase();
+    return /^#[0-9a-f]{6}$/.test(s) ? s : '#4fc3f7';
+  }
+
+  function setEventColor(color) {
+    const hex = normalizeHexColor(color);
+    document.getElementById('evColor').value = hex;
+    document.querySelectorAll('#evColorSwatches .cal-color-swatch').forEach((btn) => {
+      const on = btn.dataset.color === hex;
+      btn.classList.toggle('selected', on);
+      btn.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+  }
+
+  function initColorSwatches() {
+    const root = document.getElementById('evColorSwatches');
+    if (!root || root.dataset.ready === '1') return;
+    root.innerHTML = EVENT_COLORS.map((c) => (
+      `<button type="button" class="cal-color-swatch" role="radio" aria-checked="false"
+        data-color="${c}" style="--swatch:${c}" title="${c}" aria-label="Color ${c}"></button>`
+    )).join('');
+    root.addEventListener('click', (e) => {
+      const btn = e.target.closest('.cal-color-swatch');
+      if (!btn || btn.disabled) return;
+      setEventColor(btn.dataset.color);
+    });
+    root.dataset.ready = '1';
+    setEventColor('#4fc3f7');
+  }
+
+  function resetEventForm(defaults = {}) {
+    document.getElementById('evId').value = defaults.id || '';
+    document.getElementById('eventModalTitle').textContent = defaults.id ? 'Edit event' : 'Add event';
+    fillMetaControls(defaults.location || '', defaults.person_ids || [], defaults.group_ids || []);
+    if (defaults.type) document.getElementById('evType').value = defaults.type;
+    document.getElementById('evTitle').value = defaults.title || '';
+    document.getElementById('evDescription').value = defaults.description || '';
+    setEventColor(defaults.color || '#4fc3f7');
+
+    let mode = 'timed';
+    if (Number(defaults.all_day) === 1) mode = 'all_day';
+    else if (defaults.period === 'am') mode = 'am';
+    else if (defaults.period === 'pm') mode = 'pm';
+    setTimeMode(mode);
+
+    const start = defaults.starts_at ? parseApiDatetime(defaults.starts_at) : (defaults._startDate || new Date());
+    const end = defaults.ends_at ? parseApiDatetime(defaults.ends_at) : new Date(start.getTime());
+    if (!defaults.ends_at && mode === 'timed') {
+      end.setHours(start.getHours() + 1);
+    }
+    document.getElementById('evStart').value = toLocalInputValue(start);
+    document.getElementById('evEnd').value = toLocalInputValue(end);
+
+    const vis = defaults.visibility || 'public';
+    const visEl = document.getElementById('evVisibility');
+    if ([...visEl.options].some((o) => o.value === vis)) visEl.value = vis;
+    else visEl.value = 'public';
+    document.getElementById('evGroupsWrap').classList.toggle('hidden', visEl.value !== 'share');
+
+    document.getElementById('evDelete').classList.toggle('hidden', !defaults.id);
+    document.getElementById('evSubmit').classList.remove('hidden');
+    [...document.getElementById('eventForm').elements].forEach((el) => {
+      if (el.type === 'button' || el.type === 'submit') return;
+      el.disabled = false;
+    });
+    document.querySelectorAll('#evColorSwatches .cal-color-swatch').forEach((b) => { b.disabled = false; });
+    syncTimeInputsDisabled();
+  }
+
+  function openCreateEvent() {
+    const start = new Date();
+    start.setMinutes(0, 0, 0);
+    if (start.getHours() < HOUR_START) start.setHours(HOUR_START);
+    resetEventForm({ _startDate: start, can_edit: true });
+    openEventModal();
+  }
+
+  function openEditEvent(ev) {
+    resetEventForm({ ...ev, can_edit: true });
+    openEventModal();
+  }
+
+  function eventTimeModeLabel(ev) {
+    if (Number(ev.all_day) === 1) return 'All day';
+    if (ev.period === 'am') return 'AM';
+    if (ev.period === 'pm') return 'PM';
+    return 'Timed';
+  }
+
+  function fmtEventWhen(s) {
+    if (!s) return '—';
+    const d = parseApiDatetime(s);
+    return d.toLocaleString(undefined, {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+  }
+
+  function visibilityBadge(v) {
+    const x = String(v || 'public');
+    return `<span class="badge ${esc(x)}">${esc(x)}</span>`;
+  }
+
+  function renderAdminEventsTable() {
+    const tbody = document.getElementById('adminEventsTable');
+    if (!tbody) return;
+    if (!adminEvents.length) {
+      tbody.innerHTML = `<tr><td colspan="11" style="color:var(--text-muted)">No events match filters</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = adminEvents.map((ev) => {
+      const people = (ev.persons || []).map((p) => p.username).join(', ') || '—';
+      const color = normalizeHexColor(ev.color);
+      return `
+        <tr>
+          <td><span class="admin-ev-dot" style="background:${esc(color)}"></span></td>
+          <td style="white-space:nowrap">${esc(fmtEventWhen(ev.starts_at))}</td>
+          <td style="white-space:nowrap">${esc(fmtEventWhen(ev.ends_at))}</td>
+          <td>${esc(eventTimeModeLabel(ev))}</td>
+          <td>${esc(ev.type || '—')}</td>
+          <td><strong>${esc(ev.title || '(untitled)')}</strong></td>
+          <td>${esc(ev.location || '—')}</td>
+          <td>${esc(people)}</td>
+          <td>${visibilityBadge(ev.visibility)}</td>
+          <td>${esc(ev.owner_name || '—')}</td>
+          <td style="white-space:nowrap">
+            <button type="button" class="btn btn-sm" data-edit-ev="${ev.id}">Edit</button>
+            <button type="button" class="btn btn-sm btn-danger" data-del-ev="${ev.id}">Delete</button>
+          </td>
+        </tr>`;
+    }).join('');
+
+    tbody.querySelectorAll('[data-edit-ev]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const ev = adminEvents.find((x) => String(x.id) === btn.dataset.editEv);
+        if (ev) openEditEvent(ev);
+      });
+    });
+    tbody.querySelectorAll('[data-del-ev]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = Number(btn.dataset.delEv);
+        if (!id || !confirm('Delete this event?')) return;
+        try {
+          await api('/api/teamcal/events.php', { method: 'DELETE', body: { id } });
+          toast('Event deleted');
+          await loadAdminEvents();
+        } catch (err) {
+          toast(err.message, true);
+        }
+      });
+    });
+  }
+
+  function buildAdminEventsQuery() {
+    const params = new URLSearchParams();
+    params.set('admin', '1');
+    const from = document.getElementById('aevFrom').value;
+    const to = document.getElementById('aevTo').value;
+    params.set('from', from ? `${from} 00:00:00` : '');
+    params.set('to', to ? `${to} 23:59:59` : '');
+    const q = document.getElementById('aevQ').value.trim();
+    if (q) params.set('q', q);
+    const type = document.getElementById('aevType').value;
+    if (type) params.set('type', type);
+    const location = document.getElementById('aevLocation').value;
+    if (location) params.set('location', location);
+    const visibility = document.getElementById('aevVisibility').value;
+    if (visibility) params.set('visibility', visibility);
+    const timeMode = document.getElementById('aevTimeMode').value;
+    if (timeMode) params.set('time_mode', timeMode);
+    const color = document.getElementById('aevColor').value;
+    if (color) params.set('color', color);
+    const owner = document.getElementById('aevOwner').value;
+    if (owner) params.set('owner_id', owner);
+    const person = document.getElementById('aevPerson').value;
+    if (person) params.set('person_id', person);
+    const group = document.getElementById('aevGroup').value;
+    if (group) params.set('group_id', group);
+    return params.toString();
+  }
+
+  async function loadAdminEvents() {
+    const data = await api(`/api/teamcal/events.php?${buildAdminEventsQuery()}`);
+    adminEvents = data.events || [];
+    const countEl = document.getElementById('aevCount');
+    const truncEl = document.getElementById('aevTruncated');
+    if (countEl) countEl.textContent = `${data.count ?? adminEvents.length} event(s)`;
+    if (truncEl) truncEl.classList.toggle('hidden', !data.truncated);
+    renderAdminEventsTable();
+  }
+
+  async function loadAdminEventsPanel() {
+    initColorSwatches();
+    const range = defaultEventRange();
+    const fromEl = document.getElementById('aevFrom');
+    const toEl = document.getElementById('aevTo');
+    if (fromEl && !fromEl.value) fromEl.value = range.from;
+    if (toEl && !toEl.value) toEl.value = range.to;
+    await ensureCalMeta();
+    await loadAdminEvents();
+  }
+
+  function clearAdminEventFilters() {
+    const range = defaultEventRange();
+    document.getElementById('aevQ').value = '';
+    document.getElementById('aevFrom').value = range.from;
+    document.getElementById('aevTo').value = range.to;
+    document.getElementById('aevType').value = '';
+    document.getElementById('aevLocation').value = '';
+    document.getElementById('aevVisibility').value = '';
+    document.getElementById('aevTimeMode').value = '';
+    document.getElementById('aevColor').value = '';
+    document.getElementById('aevOwner').value = '';
+    document.getElementById('aevPerson').value = '';
+    document.getElementById('aevGroup').value = '';
+  }
+
+  document.getElementById('adminEvFilters')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      await loadAdminEvents();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+
+  document.getElementById('aevClear')?.addEventListener('click', async () => {
+    clearAdminEventFilters();
+    try {
+      await loadAdminEvents();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+
+  document.getElementById('adminEvNew')?.addEventListener('click', async () => {
+    try {
+      await ensureCalMeta();
+      initColorSwatches();
+      openCreateEvent();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+
+  document.getElementById('eventForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('evId').value;
+    const mode = getTimeMode();
+    const startVal = document.getElementById('evStart').value;
+    let endVal = document.getElementById('evEnd').value;
+    if (!startVal) return toast('Start is required', true);
+
+    const startDate = startVal.slice(0, 10);
+    let all_day = false;
+    let period = 'none';
+    let starts_at;
+    let ends_at;
+
+    if (mode === 'all_day') {
+      all_day = true;
+      const endDate = (endVal || startVal).slice(0, 10);
+      starts_at = `${startDate} 00:00:00`;
+      ends_at = `${endDate} 00:00:00`;
+    } else if (mode === 'am') {
+      period = 'am';
+      starts_at = `${startDate} 00:00:00`;
+      ends_at = `${startDate} 00:00:00`;
+    } else if (mode === 'pm') {
+      period = 'pm';
+      starts_at = `${startDate} 00:00:00`;
+      ends_at = `${startDate} 00:00:00`;
+    } else {
+      if (!endVal) endVal = startVal;
+      starts_at = toApiDatetime(startVal);
+      ends_at = toApiDatetime(endVal);
+    }
+
+    const locSel = document.getElementById('evLocationSelect').value;
+    const location = locSel === '__custom__'
+      ? document.getElementById('evLocationCustom').value.trim()
+      : locSel;
+
+    const payload = {
+      title: document.getElementById('evTitle').value.trim(),
+      type: document.getElementById('evType').value,
+      description: document.getElementById('evDescription').value.trim(),
+      location,
+      color: document.getElementById('evColor').value,
+      starts_at,
+      ends_at,
+      all_day,
+      period,
+      visibility: document.getElementById('evVisibility').value,
+      person_ids: [...document.querySelectorAll('#evPeople input:checked')].map((x) => Number(x.value)),
+      group_ids: [...document.querySelectorAll('#evGroups input:checked')].map((x) => Number(x.value)),
+    };
+
+    try {
+      if (id) {
+        payload.id = Number(id);
+        await api('/api/teamcal/events.php', { method: 'PUT', body: payload });
+        toast('Event updated');
+      } else {
+        await api('/api/teamcal/events.php', { method: 'POST', body: payload });
+        toast('Event created');
+      }
+      closeEventModal();
+      await loadAdminEvents();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+
+  document.getElementById('evDelete')?.addEventListener('click', async () => {
+    const id = Number(document.getElementById('evId').value);
+    if (!id || !confirm('Delete this event?')) return;
+    try {
+      await api('/api/teamcal/events.php', { method: 'DELETE', body: { id } });
+      toast('Event deleted');
+      closeEventModal();
+      await loadAdminEvents();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
 
   async function loadUsers() {
     users = await api('/api/users.php');
@@ -60,7 +545,13 @@
       <tr>
         <td>${u.id}</td>
         <td>${esc(u.username)}</td>
-        <td><span class="badge ${u.role === 'admin' ? 'admin' : ''}">${esc(u.role)}</span></td>
+        <td>
+          <select class="form-control" data-role="${u.id}" data-prev="${esc(u.role)}"
+            style="width:auto;min-width:7rem;padding:4px 8px;font-size:0.85rem">
+            <option value="user" ${u.role === 'user' ? 'selected' : ''}>user</option>
+            <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>admin</option>
+          </select>
+        </td>
         <td>
           <span class="badge ${active ? 'public' : ''}" style="${active ? '' : 'background:rgba(239,83,80,0.18);color:#ff8a80'}">
             ${active ? 'Active' : 'Inactive'}
@@ -96,6 +587,26 @@
           await refresh();
         } catch (err) {
           toast(err.message, true);
+        }
+      });
+    });
+
+    tbody.querySelectorAll('[data-role]').forEach((sel) => {
+      sel.addEventListener('change', async () => {
+        const id = Number(sel.dataset.role);
+        const role = sel.value;
+        const prev = sel.dataset.prev || 'user';
+        try {
+          await api('/api/users.php', {
+            method: 'PUT',
+            body: { id, role },
+          });
+          sel.dataset.prev = role;
+          toast(`Role updated to ${role}`);
+          await refresh();
+        } catch (err) {
+          toast(err.message, true);
+          sel.value = prev;
         }
       });
     });

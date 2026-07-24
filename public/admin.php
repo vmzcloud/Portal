@@ -56,6 +56,7 @@ if ($teamcalLocationsJson === false) {
     <div class="admin-nav">
       <button class="btn btn-sm btn-primary" data-panel="users">Users</button>
       <button class="btn btn-sm" data-panel="groups">Groups</button>
+      <button class="btn btn-sm" data-panel="events">Events</button>
       <button class="btn btn-sm" data-panel="teamcal">Team Calendar</button>
     </div>
 
@@ -140,6 +141,120 @@ if ($teamcalLocationsJson === false) {
       </div>
     </section>
 
+    <section class="admin-panel hidden" id="panel-events">
+      <div class="admin-events-header">
+        <h2 style="margin:0">Event management</h2>
+        <button type="button" class="btn btn-sm btn-primary" id="adminEvNew">+ Event</button>
+      </div>
+      <form id="adminEvFilters" class="admin-event-filters">
+        <div class="form-group">
+          <label for="aevQ">Search</label>
+          <input class="form-control" id="aevQ" type="search" placeholder="Title, description, location">
+        </div>
+        <div class="form-group">
+          <label for="aevFrom">From</label>
+          <input class="form-control" id="aevFrom" type="date" required>
+        </div>
+        <div class="form-group">
+          <label for="aevTo">To</label>
+          <input class="form-control" id="aevTo" type="date" required>
+        </div>
+        <div class="form-group">
+          <label for="aevType">Type</label>
+          <select class="form-control" id="aevType">
+            <option value="">All</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="aevLocation">Location</label>
+          <select class="form-control" id="aevLocation">
+            <option value="">All</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="aevVisibility">Visibility</label>
+          <select class="form-control" id="aevVisibility">
+            <option value="">All</option>
+            <option value="public">public</option>
+            <option value="share">share</option>
+            <option value="private">private</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="aevTimeMode">Time mode</label>
+          <select class="form-control" id="aevTimeMode">
+            <option value="">All</option>
+            <option value="timed">Timed</option>
+            <option value="all_day">All day</option>
+            <option value="am">AM</option>
+            <option value="pm">PM</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="aevColor">Color</label>
+          <select class="form-control" id="aevColor">
+            <option value="">All</option>
+            <option value="#4fc3f7">Blue</option>
+            <option value="#ab47bc">Purple</option>
+            <option value="#ef5350">Red</option>
+            <option value="#66bb6a">Green</option>
+            <option value="#ffa726">Orange</option>
+            <option value="#26c6da">Cyan</option>
+            <option value="#ec407a">Pink</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="aevOwner">Owner</label>
+          <select class="form-control" id="aevOwner">
+            <option value="">All</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="aevPerson">Person</label>
+          <select class="form-control" id="aevPerson">
+            <option value="">All</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="aevGroup">Group</label>
+          <select class="form-control" id="aevGroup">
+            <option value="">All</option>
+          </select>
+        </div>
+        <div class="form-group admin-event-filter-actions">
+          <label>&nbsp;</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+            <button type="button" class="btn btn-sm" id="aevClear">Clear</button>
+          </div>
+        </div>
+      </form>
+      <div class="admin-event-meta">
+        <span id="aevCount">0 events</span>
+        <span id="aevTruncated" class="hidden" style="color:var(--warning)">Showing first 500 — narrow filters</span>
+      </div>
+      <div class="table-wrap">
+        <table class="data admin-events-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Start</th>
+              <th>End</th>
+              <th>Mode</th>
+              <th>Type</th>
+              <th>Title</th>
+              <th>Location</th>
+              <th>People</th>
+              <th>Visibility</th>
+              <th>Owner</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="adminEventsTable"></tbody>
+        </table>
+      </div>
+    </section>
+
     <section class="admin-panel hidden" id="panel-teamcal">
       <h2>Team Calendar</h2>
       <div class="form-group">
@@ -209,6 +324,82 @@ if ($teamcalLocationsJson === false) {
         <div class="form-hint" id="teamcalHolidayCount">Holidays loaded: —</div>
       </div>
     </section>
+  </div>
+
+  <div class="modal-backdrop" id="eventModal" role="dialog" aria-modal="true">
+    <div class="modal cal-modal">
+      <h2 id="eventModalTitle">Add event</h2>
+      <form id="eventForm">
+        <input type="hidden" id="evId">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="evType">Type</label>
+            <select class="form-control" id="evType"></select>
+          </div>
+          <div class="form-group">
+            <label>Color</label>
+            <input type="hidden" id="evColor" value="#4fc3f7">
+            <div class="cal-color-swatches" id="evColorSwatches" role="radiogroup" aria-label="Color"></div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="evTitle">Title</label>
+          <input class="form-control" id="evTitle" required maxlength="200" placeholder="Event title">
+        </div>
+        <div class="form-group">
+          <label>People</label>
+          <div class="checkbox-list cal-people-list" id="evPeople"></div>
+        </div>
+        <div class="form-group">
+          <label for="evLocationSelect">Location</label>
+          <select class="form-control" id="evLocationSelect"></select>
+          <input class="form-control hidden" id="evLocationCustom" style="margin-top:8px" placeholder="Type location">
+        </div>
+        <div class="form-group">
+          <label for="evDescription">Description</label>
+          <textarea class="form-control" id="evDescription" rows="3" maxlength="2000"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Time mode</label>
+          <div class="cal-time-mode">
+            <label><input type="radio" name="evTimeMode" value="timed" checked> Timed</label>
+            <label><input type="radio" name="evTimeMode" value="all_day"> All day</label>
+            <label><input type="radio" name="evTimeMode" value="am"> AM</label>
+            <label><input type="radio" name="evTimeMode" value="pm"> PM</label>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="evStart">Start</label>
+            <input class="form-control" id="evStart" type="datetime-local" required>
+          </div>
+          <div class="form-group">
+            <label for="evEnd">End</label>
+            <input class="form-control" id="evEnd" type="datetime-local" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="evVisibility">Visibility</label>
+            <select class="form-control" id="evVisibility">
+              <option value="public">Public (everyone)</option>
+              <option value="share">Share (selected groups)</option>
+              <option value="private">Private (only me)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group hidden" id="evGroupsWrap">
+          <label>Share groups</label>
+          <div class="checkbox-list" id="evGroups"></div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-danger hidden" id="evDelete">Delete</button>
+          <div style="flex:1"></div>
+          <button type="button" class="btn btn-ghost" data-close-modal>Cancel</button>
+          <button type="submit" class="btn btn-primary" id="evSubmit">Save</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <div class="toast" id="toast"></div>
