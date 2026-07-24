@@ -55,9 +55,13 @@ $csrf = Auth::csrfToken();
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Change password · Portal</title>
+  <script>(function(){try{var t=localStorage.getItem('portal-theme');if(t!=='light'&&t!=='dark')t='dark';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
   <link rel="stylesheet" href="<?= e(asset_url('assets/css/style.css')) ?>">
 </head>
 <body>
+  <div class="auth-theme-bar">
+    <button type="button" class="btn btn-sm btn-ghost" id="themeToggle" aria-label="Toggle theme" title="Theme">☀</button>
+  </div>
   <div class="auth-page">
     <div class="auth-card">
       <h1>Change password</h1>
@@ -99,5 +103,6 @@ $csrf = Auth::csrfToken();
       <?php endif; ?>
     </div>
   </div>
+  <script src="<?= e(asset_url('assets/js/theme.js')) ?>"></script>
 </body>
 </html>

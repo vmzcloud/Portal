@@ -25,6 +25,7 @@ $isAdmin = Auth::isAdmin();
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Team Calendar · Portal</title>
+  <script>(function(){try{var t=localStorage.getItem('portal-theme');if(t!=='light'&&t!=='dark')t='dark';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
   <link rel="stylesheet" href="<?= e(asset_url('assets/css/style.css')) ?>">
 </head>
 <body
@@ -36,6 +37,7 @@ $isAdmin = Auth::isAdmin();
   <header class="app-header">
     <div class="brand">TEAM CALENDAR</div>
     <div class="header-actions">
+      <button type="button" class="btn btn-sm btn-ghost" id="themeToggle" aria-label="Toggle theme" title="Theme">☀</button>
       <a class="btn btn-sm" href="/">Portal</a>
       <button type="button" class="btn btn-sm btn-primary" id="btnNewEvent">+ Event</button>
       <?php if ($isAdmin): ?>
@@ -155,6 +157,7 @@ $isAdmin = Auth::isAdmin();
   </div>
 
   <div class="toast" id="toast"></div>
+  <script src="<?= e(asset_url('assets/js/theme.js')) ?>"></script>
   <script src="<?= e(asset_url('assets/js/calendar.js')) ?>"></script>
 </body>
 </html>

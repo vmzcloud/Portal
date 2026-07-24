@@ -37,12 +37,14 @@ if ($teamcalLocationsJson === false) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Admin · Portal</title>
+  <script>(function(){try{var t=localStorage.getItem('portal-theme');if(t!=='light'&&t!=='dark')t='dark';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
   <link rel="stylesheet" href="<?= e(asset_url('assets/css/style.css')) ?>">
 </head>
 <body data-csrf="<?= e($csrf) ?>" data-auth="1" data-admin="1">
   <header class="app-header">
     <div class="brand">PORTAL ADMIN</div>
     <div class="header-actions">
+      <button type="button" class="btn btn-sm btn-ghost" id="themeToggle" aria-label="Toggle theme" title="Theme">☀</button>
       <a class="btn btn-sm" href="/">Back to portal</a>
       <span class="user-chip"><?= e($user['username']) ?></span>
       <form method="post" action="/logout.php" style="display:inline">
@@ -403,6 +405,7 @@ if ($teamcalLocationsJson === false) {
   </div>
 
   <div class="toast" id="toast"></div>
+  <script src="<?= e(asset_url('assets/js/theme.js')) ?>"></script>
   <script src="<?= e(asset_url('assets/js/admin.js')) ?>"></script>
 </body>
 </html>

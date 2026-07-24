@@ -241,7 +241,7 @@ Edit / delete: **owner** or **admin**. Guest-created public events have no owner
 
 ### UI chrome
 
-- Dark theme  
+- **Dark / light theme** toggle (header ☀/☾; preference saved in the browser)  
 - Sticky header; bookmark tabs and category sections  
 - Asset URLs are cache-busted (`?v=filemtime`)  
 - Footer (portal home): **date** and **time** only  
@@ -300,7 +300,7 @@ Portal/
 │   │       ├── import.php
 │   │       ├── meta.php
 │   │       └── settings.php
-│   ├── assets/css|js/      # style.css, app.js, admin.js, calendar.js
+│   ├── assets/css|js/      # style.css, theme.js, app.js, admin.js, calendar.js
 │   ├── uploads/icons/
 │   ├── index.php           # main bookmark portal
 │   ├── calendar.php        # Team Calendar week view

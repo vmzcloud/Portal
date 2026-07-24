@@ -20,6 +20,7 @@ $teamcalEnabled = TeamCal::isEnabled();
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Portal</title>
+  <script>(function(){try{var t=localStorage.getItem('portal-theme');if(t!=='light'&&t!=='dark')t='dark';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
   <link rel="stylesheet" href="<?= e(asset_url('assets/css/style.css')) ?>">
 </head>
 <body
@@ -32,6 +33,7 @@ $teamcalEnabled = TeamCal::isEnabled();
     <div class="brand">PORTAL</div>
     <nav class="tabs" id="tabsNav" aria-label="Tabs"></nav>
     <div class="header-actions">
+      <button type="button" class="btn btn-sm btn-ghost" id="themeToggle" aria-label="Toggle theme" title="Theme">☀</button>
       <?php if ($teamcalEnabled): ?>
         <a class="btn btn-sm" href="/calendar.php">Calendar</a>
       <?php endif; ?>
@@ -206,6 +208,7 @@ $teamcalEnabled = TeamCal::isEnabled();
 
   <div class="category-picker" id="categoryPicker" role="menu" aria-label="Choose category"></div>
   <div class="toast" id="toast"></div>
+  <script src="<?= e(asset_url('assets/js/theme.js')) ?>"></script>
   <script src="<?= e(asset_url('assets/js/app.js')) ?>"></script>
 </body>
 </html>
