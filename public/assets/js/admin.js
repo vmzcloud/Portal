@@ -44,8 +44,10 @@
       document.getElementById('panel-groups').classList.toggle('hidden', panel !== 'groups');
       document.getElementById('panel-events')?.classList.toggle('hidden', panel !== 'events');
       document.getElementById('panel-teamcal').classList.toggle('hidden', panel !== 'teamcal');
+      document.getElementById('panel-notes')?.classList.toggle('hidden', panel !== 'notes');
       if (panel === 'teamcal') loadTeamCal().catch((err) => toast(err.message, true));
       if (panel === 'events') loadAdminEventsPanel().catch((err) => toast(err.message, true));
+      if (panel === 'notes') loadNotesSettings().catch((err) => toast(err.message, true));
     });
   });
 
@@ -932,6 +934,22 @@
       await api('/api/teamcal/holidays.php', { method: 'DELETE', body: {} });
       document.getElementById('teamcalHolidayCount').textContent = 'Holidays loaded: 0';
       toast('Holidays cleared');
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+
+  async function loadNotesSettings() {
+    const data = await api('/api/notes/settings.php');
+    const el = document.getElementById('notesEnabled');
+    if (el) el.checked = !!data.enabled;
+  }
+
+  document.getElementById('notesSaveEnabled')?.addEventListener('click', async () => {
+    try {
+      const enabled = document.getElementById('notesEnabled').checked;
+      await api('/api/notes/settings.php', { method: 'PUT', body: { enabled } });
+      toast(enabled ? 'Notes enabled' : 'Notes disabled');
     } catch (err) {
       toast(err.message, true);
     }

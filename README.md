@@ -5,7 +5,7 @@ Dark-themed personal portal built with **PHP + SQLite**.
 - **UI language:** English  
 - **Content:** any UTF-8 text (including Chinese titles / labels)  
 - **Stack:** plain PHP (no Composer / Node build), SQLite file DBs  
-- **Apps:** bookmark start page + optional **Team Calendar**
+- **Apps:** bookmark start page + optional **Team Calendar** + optional **Notes**
 
 ## Requirements
 
@@ -79,7 +79,8 @@ Open: **http://localhost:8080**
 | demo  | demo123  | user  |
 
 First start creates `data/portal.db` and seed data (tabs, categories, sample bookmarks).  
-Team Calendar uses a separate DB (`data/teamcal.db`), created on first access, **disabled by default**.
+Team Calendar uses a separate DB (`data/teamcal.db`), created on first access, **disabled by default**.  
+Notes uses a separate DB (`data/notes.db`), created on first access, **disabled by default**.
 
 **Change default passwords before any real deployment.**
 
@@ -87,14 +88,15 @@ Team Calendar uses a separate DB (`data/teamcal.db`), created on first access, *
 
 ```bash
 docker compose down
-rm -f data/portal.db data/teamcal.db
+rm -f data/portal.db data/teamcal.db data/notes.db
 # optional: reset type/location lists
 # rm -rf data/teamcal
 docker compose up -d --build
 ```
 
 Existing portal DBs pick up schema updates automatically (e.g. `is_active`, `must_change_password`).  
-Team Calendar tables are ensured on connect via `TeamCalDatabase`.
+Team Calendar tables are ensured on connect via `TeamCalDatabase`.  
+Notes tables are ensured on connect via `NotesDatabase`.
 
 ## Features
 
@@ -213,6 +215,36 @@ Edit / delete: **owner** or **admin**. Guest-created public events have no owner
 - Holidays map: `data/teamcal/holidays.json`  
 - Schema reference: `sql/teamcal_schema.sql`  
 
+### Notes
+
+Optional personal/shared notes (`/notes.php`). **Off by default.** **Login users only** (no guests).
+
+**Enable**
+
+1. Log in as admin → **Admin** → **Notes**  
+2. Check **Enable Notes** → **Save setting**  
+3. Logged-in users see **Notes** in the header, or open `/notes.php`
+
+**UI**
+
+- **List** view (default): sidebar of notes + main editor  
+- **Cards** view: card grid; click opens editor overlay  
+- Search filters the list  
+- View mode remembered in the browser  
+
+**Note fields**
+
+- Title  
+- Rich text body (toolbar: bold, italic, underline, lists, heading, quote, link)  
+- Visibility: **private** (owner + admin) or **share** (selected groups + owner + admin)  
+- No public notes  
+
+**Storage**
+
+- `data/notes.db` (separate from portal and teamcal DBs)  
+- Schema reference: `sql/notes_schema.sql`  
+- HTML body is sanitized server-side (allowlisted tags only)  
+
 ### Authentication
 
 - Session login + CSRF on mutating requests  
@@ -228,7 +260,7 @@ Edit / delete: **owner** or **admin**. Guest-created public events have no owner
 - **Users:** create, delete, reset password, activate/deactivate, force password change, **change role** (`user` ↔ `admin`)  
   - Cannot demote, deactivate, or delete your own admin account  
   - Role changes apply after the target user logs in again  
-- **Groups:** create/edit/delete groups, assign members (for **share** bookmarks / events)  
+- **Groups:** create/edit/delete groups, assign members (for **share** bookmarks / events / notes)  
 - **Events** (Team Calendar list management — admin only):  
   - Table of events with **Edit** / **Delete** and **+ Event** (same modal form as the week view)  
   - **Search** across title, description, location  
@@ -237,7 +269,7 @@ Edit / delete: **owner** or **admin**. Guest-created public events have no owner
   - Results capped at **500** (narrow filters if truncated)  
   - Admins can list/manage events even when Team Calendar is disabled  
 - **Team Calendar** settings: enable toggle, period ranges, types/locations JSON editors, holiday ICS  
-
+- **Notes**: enable / disable toggle only  
 
 ### UI chrome
 
@@ -264,6 +296,10 @@ Edit / delete: **owner** or **admin**. Guest-created public events have no owner
 | Edit/delete any calendar event | — | — | ✓ |
 | Admin event list (search / filter / manage) | — | — | ✓ |
 | Enable Team Calendar / edit type & location lists | — | — | ✓ |
+| Open Notes (when enabled) | — | ✓ | ✓ |
+| CRUD own notes / view share notes | — | ✓ | ✓ |
+| Edit/delete any note | — | — | ✓ |
+| Enable Notes | — | — | ✓ |
 
 ## Data & files
 
@@ -271,12 +307,14 @@ Edit / delete: **owner** or **admin**. Guest-created public events have no owner
 |------|---------|
 | `data/portal.db` | Users, groups, tabs, categories, bookmarks |
 | `data/teamcal.db` | Team Calendar settings + events |
+| `data/notes.db` | Notes settings + notes |
 | `data/teamcal/event_types.json` | Event type dropdown list |
 | `data/teamcal/locations.json` | Location dropdown list |
 | `data/teamcal/holidays.json` | Holiday dates (from holiday ICS) |
 | `public/uploads/icons/` | Uploaded bookmark icons |
 | `sql/schema.sql` | Portal schema (new installs) |
 | `sql/teamcal_schema.sql` | Team Calendar schema reference |
+| `sql/notes_schema.sql` | Notes schema reference |
 
 Compose mounts `./data` (and `./public`, `./src`) so databases and uploads survive container rebuilds.
 
@@ -294,16 +332,21 @@ Portal/
 │   │   ├── password.php
 │   │   ├── tabs.php
 │   │   ├── users.php
+│   │   ├── notes/
+│   │   │   ├── notes.php
+│   │   │   ├── meta.php
+│   │   │   └── settings.php
 │   │   └── teamcal/
 │   │       ├── events.php
 │   │       ├── holidays.php
 │   │       ├── import.php
 │   │       ├── meta.php
 │   │       └── settings.php
-│   ├── assets/css|js/      # style.css, theme.js, app.js, admin.js, calendar.js
+│   ├── assets/css|js/      # style.css, theme.js, app.js, admin.js, calendar.js, notes.js
 │   ├── uploads/icons/
 │   ├── index.php           # main bookmark portal
 │   ├── calendar.php        # Team Calendar week view
+│   ├── notes.php           # Notes (login, when enabled)
 │   ├── login.php
 │   ├── logout.php
 │   ├── change-password.php
@@ -314,12 +357,15 @@ Portal/
 │   ├── Database.php        # portal.db
 │   ├── TeamCal.php
 │   ├── TeamCalDatabase.php # teamcal.db
+│   ├── Notes.php
+│   ├── NotesDatabase.php   # notes.db
 │   ├── IcsParser.php       # .ics import / holidays
 │   ├── helpers.php
 │   └── bootstrap.php
 ├── sql/
 │   ├── schema.sql
-│   └── teamcal_schema.sql
+│   ├── teamcal_schema.sql
+│   └── notes_schema.sql
 ├── data/                   # runtime DBs + teamcal JSON (not in docroot)
 ├── Dockerfile
 ├── docker-compose.yml

@@ -16,6 +16,8 @@ if (Auth::mustChangePassword()) {
 $csrf = Auth::csrfToken();
 TeamCalDatabase::connection();
 $teamcalEnabled = TeamCal::isEnabled();
+NotesDatabase::connection();
+$notesEnabled = Notes::isEnabled();
 $teamcalTypesJson = json_encode(
     TeamCal::eventTypes(),
     JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
@@ -60,6 +62,7 @@ if ($teamcalLocationsJson === false) {
       <button class="btn btn-sm" data-panel="groups">Groups</button>
       <button class="btn btn-sm" data-panel="events">Events</button>
       <button class="btn btn-sm" data-panel="teamcal">Team Calendar</button>
+      <button class="btn btn-sm" data-panel="notes">Notes</button>
     </div>
 
     <section class="admin-panel" id="panel-users">
@@ -324,6 +327,19 @@ if ($teamcalLocationsJson === false) {
           <button type="button" class="btn btn-ghost" id="teamcalClearHolidays">Clear holidays</button>
         </div>
         <div class="form-hint" id="teamcalHolidayCount">Holidays loaded: —</div>
+      </div>
+    </section>
+
+    <section class="admin-panel hidden" id="panel-notes">
+      <h2>Notes</h2>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:10px;margin:0">
+          <input type="checkbox" id="notesEnabled"<?= $notesEnabled ? ' checked' : '' ?>> Enable Notes
+        </label>
+        <div class="form-hint">When disabled, the Notes link and page are hidden. Default is off. Login users only; notes can be private or shared with groups.</div>
+      </div>
+      <div class="form-actions" style="justify-content:flex-start;margin-bottom:8px">
+        <button type="button" class="btn btn-primary" id="notesSaveEnabled">Save setting</button>
       </div>
     </section>
   </div>

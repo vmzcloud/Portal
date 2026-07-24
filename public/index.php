@@ -13,6 +13,8 @@ $csrf = Auth::csrfToken();
 $isAdmin = Auth::isAdmin();
 TeamCalDatabase::connection();
 $teamcalEnabled = TeamCal::isEnabled();
+NotesDatabase::connection();
+$notesEnabled = Notes::isEnabled();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -36,6 +38,9 @@ $teamcalEnabled = TeamCal::isEnabled();
       <button type="button" class="btn btn-sm btn-ghost" id="themeToggle" aria-label="Toggle theme" title="Theme">☀</button>
       <?php if ($teamcalEnabled): ?>
         <a class="btn btn-sm" href="/calendar.php">Calendar</a>
+      <?php endif; ?>
+      <?php if ($notesEnabled && $user): ?>
+        <a class="btn btn-sm" href="/notes.php">Notes</a>
       <?php endif; ?>
       <?php if ($user): ?>
         <button type="button" class="btn btn-sm" id="btnAddBookmark">+ Bookmark</button>
