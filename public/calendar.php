@@ -63,6 +63,10 @@ $isAdmin = Auth::isAdmin();
         <button type="button" class="btn btn-sm" id="calPrev" aria-label="Previous week">‹</button>
         <button type="button" class="btn btn-sm" id="calToday">This week</button>
         <button type="button" class="btn btn-sm" id="calNext" aria-label="Next week">›</button>
+        <label class="cal-goto">
+          <span class="sr-only">Go to date</span>
+          <input type="date" id="calGoToDate" title="Go to date">
+        </label>
       </div>
       <h1 class="cal-week-label" id="calWeekLabel">Week</h1>
       <div class="cal-toolbar-right">
@@ -83,8 +87,9 @@ $isAdmin = Auth::isAdmin();
             <select class="form-control" id="evType"></select>
           </div>
           <div class="form-group">
-            <label for="evColor">Color</label>
-            <input class="form-control" id="evColor" type="color" value="#4fc3f7">
+            <label>Color</label>
+            <input type="hidden" id="evColor" value="#4fc3f7">
+            <div class="cal-color-swatches" id="evColorSwatches" role="radiogroup" aria-label="Color"></div>
           </div>
         </div>
         <div class="form-group">

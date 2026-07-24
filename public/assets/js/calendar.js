@@ -5,6 +5,15 @@
   const toastEl = document.getElementById('toast');
 
   const HOUR_START = 9;
+  const EVENT_COLORS = [
+    '#4fc3f7',
+    '#ab47bc',
+    '#ef5350',
+    '#66bb6a',
+    '#ffa726',
+    '#26c6da',
+    '#ec407a',
+  ];
 
   let meta = { types: [], locations: [], users: [], groups: [] };
   let events = [];
@@ -177,6 +186,46 @@
     syncTimeInputsDisabled();
   }
 
+  function normalizeHexColor(c) {
+    const s = String(c || '').trim().toLowerCase();
+    return /^#[0-9a-f]{6}$/.test(s) ? s : '#4fc3f7';
+  }
+
+  function setEventColor(color, { snap = false } = {}) {
+    let hex = normalizeHexColor(color);
+    if (snap && !EVENT_COLORS.includes(hex)) {
+      hex = EVENT_COLORS[0];
+    }
+    document.getElementById('evColor').value = hex;
+    document.querySelectorAll('#evColorSwatches .cal-color-swatch').forEach((btn) => {
+      const on = btn.dataset.color === hex;
+      btn.classList.toggle('selected', on);
+      btn.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+  }
+
+  function setColorSwatchesDisabled(disabled) {
+    document.querySelectorAll('#evColorSwatches .cal-color-swatch').forEach((btn) => {
+      btn.disabled = !!disabled;
+    });
+  }
+
+  function initColorSwatches() {
+    const root = document.getElementById('evColorSwatches');
+    if (!root || root.dataset.ready === '1') return;
+    root.innerHTML = EVENT_COLORS.map((c) => (
+      `<button type="button" class="cal-color-swatch" role="radio" aria-checked="false"
+        data-color="${c}" style="--swatch:${c}" title="${c}" aria-label="Color ${c}"></button>`
+    )).join('');
+    root.addEventListener('click', (e) => {
+      const btn = e.target.closest('.cal-color-swatch');
+      if (!btn || btn.disabled) return;
+      setEventColor(btn.dataset.color);
+    });
+    root.dataset.ready = '1';
+    setEventColor('#4fc3f7');
+  }
+
   function getTimeMode() {
     return document.querySelector('input[name="evTimeMode"]:checked')?.value || 'timed';
   }
@@ -204,7 +253,7 @@
     if (defaults.type) document.getElementById('evType').value = defaults.type;
     document.getElementById('evTitle').value = defaults.title || '';
     document.getElementById('evDescription').value = defaults.description || '';
-    document.getElementById('evColor').value = defaults.color || '#4fc3f7';
+    setEventColor(defaults.color || '#4fc3f7');
 
     let mode = 'timed';
     if (Number(defaults.all_day) === 1) mode = 'all_day';
@@ -228,17 +277,20 @@
 
     const canEdit = defaults.can_edit !== false;
     const isEdit = !!defaults.id;
+    const lock = isEdit && !canEdit;
     document.getElementById('evDelete').classList.toggle('hidden', !(isEdit && defaults.can_edit));
     document.getElementById('evSubmit').classList.toggle('hidden', isEdit && !canEdit);
     [...document.getElementById('eventForm').elements].forEach((el) => {
       if (el.id === 'evDelete' || el.hasAttribute('data-close-modal')) return;
       if (el.type === 'button' || el.type === 'submit') return;
-      el.disabled = isEdit && !canEdit && el.id !== 'evDelete';
+      el.disabled = lock && el.id !== 'evDelete';
     });
+    setColorSwatchesDisabled(lock);
     if (!isEdit) {
       [...document.getElementById('eventForm').elements].forEach((el) => {
         if (el.id !== 'evEnd' || getTimeMode() === 'timed') el.disabled = false;
       });
+      setColorSwatchesDisabled(false);
       syncTimeInputsDisabled();
     }
   }
@@ -467,6 +519,8 @@
 
   function renderWeek() {
     document.getElementById('calWeekLabel').textContent = fmtWeekLabel(weekStart);
+    const goTo = document.getElementById('calGoToDate');
+    if (goTo) goTo.value = ymd(weekStart);
     const root = document.getElementById('calWeek');
     const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
@@ -546,9 +600,19 @@
     weekStart = startOfWeek(new Date());
     await reloadWeek();
   });
+  document.getElementById('calGoToDate').addEventListener('change', async (e) => {
+    const v = e.target.value;
+    if (!v) return;
+    const parts = v.split('-').map(Number);
+    if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return;
+    const [y, m, d] = parts;
+    weekStart = startOfWeek(new Date(y, m - 1, d));
+    await reloadWeek();
+  });
 
   async function init() {
     try {
+      initColorSwatches();
       await loadMeta();
       await reloadWeek();
     } catch (err) {
