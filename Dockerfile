@@ -1,7 +1,7 @@
 FROM php:8.4.22-apache
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libsqlite3-0 libsqlite3-dev \
+    && apt-get install -y --no-install-recommends libsqlite3-0 libsqlite3-dev tzdata \
     && docker-php-ext-install pdo_sqlite \
     && a2enmod rewrite headers \
     && apt-get purge -y --auto-remove libsqlite3-dev \

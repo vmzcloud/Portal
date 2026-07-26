@@ -126,6 +126,11 @@ if ($method === 'PUT' || $method === 'PATCH') {
     }
 
     $data = notes_validate_payload($body);
+
+    if (Notes::contentChanged($existing, $data['title'], $data['body_html'])) {
+        Notes::snapshotVersion($id, $existing, (int) $user['id']);
+    }
+
     $pdo->prepare(
         'UPDATE notes SET title = ?, body_html = ?, visibility = ?, updated_at = datetime(\'now\')
          WHERE id = ?'
@@ -137,6 +142,7 @@ if ($method === 'PUT' || $method === 'PATCH') {
     ]);
     Notes::syncGroups($id, $data['group_ids']);
     Notes::syncTags($id, $data['tags']);
+    Notes::pruneVersions($id);
 
     $note = Notes::loadNote($id);
     $note['can_edit'] = true;

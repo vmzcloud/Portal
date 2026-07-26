@@ -44,7 +44,10 @@
 
   function fmtWhen(s) {
     if (!s) return '';
-    const d = new Date(String(s).replace(' ', 'T'));
+    let raw = String(s).trim().replace(' ', 'T');
+    // SQLite datetime('now') is UTC without offset
+    if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(raw)) raw += 'Z';
+    const d = new Date(raw);
     if (Number.isNaN(d.getTime())) return String(s);
     return d.toLocaleString(undefined, {
       month: 'short', day: 'numeric', year: 'numeric',
@@ -233,6 +236,8 @@
     document.getElementById('notesEmpty').classList.remove('hidden');
     document.getElementById('notesEditor').classList.add('hidden');
     selectedId = null;
+    closeHistoryPanel();
+    document.getElementById('noteHistory')?.classList.add('hidden');
   }
 
   function lockEditor(lock) {
@@ -300,6 +305,96 @@
     document.execCommand('foreColor', false, color);
   }
 
+  function closeHistoryPanel() {
+    document.getElementById('noteHistoryPanel')?.classList.add('hidden');
+  }
+
+  function renderHistoryList(versions, canEdit) {
+    const box = document.getElementById('noteHistoryList');
+    if (!versions.length) {
+      box.innerHTML = '<div class="notes-history-empty">No previous versions yet. Save changes to create history.</div>';
+      return;
+    }
+    box.innerHTML = versions.map((v) => `
+      <div class="notes-history-item" data-version-id="${v.id}">
+        <div class="notes-history-item-top">
+          <div class="notes-history-item-main">
+            <div class="notes-history-title">${esc(v.title || 'Untitled')}</div>
+            <div class="notes-history-preview">${esc(v.preview || '—')}</div>
+            <div class="notes-history-meta">
+              ${esc(fmtWhen(v.created_at))}
+              ${v.created_by_name ? ` · ${esc(v.created_by_name)}` : ''}
+            </div>
+          </div>
+          <div class="notes-history-actions">
+            <button type="button" class="btn btn-sm" data-preview-version="${v.id}">Preview</button>
+            ${canEdit ? `<button type="button" class="btn btn-sm btn-primary" data-restore-version="${v.id}">Restore</button>` : ''}
+          </div>
+        </div>
+        <div class="notes-history-body hidden" data-version-body="${v.id}"></div>
+      </div>
+    `).join('');
+
+    box.querySelectorAll('[data-preview-version]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const vid = Number(btn.dataset.previewVersion);
+        const bodyEl = box.querySelector(`[data-version-body="${vid}"]`);
+        if (!bodyEl) return;
+        if (!bodyEl.classList.contains('hidden') && bodyEl.dataset.loaded === '1') {
+          bodyEl.classList.add('hidden');
+          return;
+        }
+        try {
+          const noteId = Number(document.getElementById('noteId').value);
+          const version = await api(`/api/notes/versions.php?note_id=${noteId}&id=${vid}`);
+          bodyEl.innerHTML = version.body_html || '<em style="color:var(--text-muted)">Empty</em>';
+          bodyEl.dataset.loaded = '1';
+          bodyEl.classList.remove('hidden');
+        } catch (err) {
+          toast(err.message, true);
+        }
+      });
+    });
+
+    box.querySelectorAll('[data-restore-version]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const vid = Number(btn.dataset.restoreVersion);
+        if (!confirm('Restore this version? Current title and body will be saved to history first if they differ.')) return;
+        try {
+          const noteId = Number(document.getElementById('noteId').value);
+          const saved = await api('/api/notes/versions.php', {
+            method: 'POST',
+            body: { note_id: noteId, version_id: vid },
+          });
+          toast('Version restored');
+          await loadNotes(getSearchQuery());
+          selectedId = saved.id;
+          showEditorFor(saved.id);
+          closeHistoryPanel();
+        } catch (err) {
+          toast(err.message, true);
+        }
+      });
+    });
+  }
+
+  async function openHistoryPanel() {
+    const noteId = Number(document.getElementById('noteId').value);
+    if (!noteId) return;
+    const panel = document.getElementById('noteHistoryPanel');
+    const list = document.getElementById('noteHistoryList');
+    panel.classList.remove('hidden');
+    list.innerHTML = '<div class="notes-history-empty">Loading…</div>';
+    const note = notes.find((n) => String(n.id) === String(noteId));
+    const canEdit = !note || note.can_edit !== false;
+    try {
+      const versions = await api(`/api/notes/versions.php?note_id=${noteId}`);
+      renderHistoryList(versions || [], canEdit);
+    } catch (err) {
+      list.innerHTML = `<div class="notes-history-empty">${esc(err.message)}</div>`;
+    }
+  }
+
   function loadNoteIntoEditor(note) {
     selectedId = note ? note.id : null;
     document.getElementById('notesEmpty').classList.add('hidden');
@@ -312,10 +407,12 @@
     setEditorTags(note?.tags || []);
     noteTagInput.value = '';
     syncVisibilityUi();
+    closeHistoryPanel();
 
     const canEdit = !note || note.can_edit !== false;
     lockEditor(!canEdit);
     document.getElementById('noteDelete').classList.toggle('hidden', !(note && canEdit));
+    document.getElementById('noteHistory').classList.toggle('hidden', !(note && note.id));
 
     const meta = [];
     if (note?.owner_name) meta.push(`Owner: ${note.owner_name}`);
@@ -504,6 +601,11 @@
   if (noteFontColor && noteColorLabel) {
     noteColorLabel.style.borderBottomColor = noteFontColor.value;
   }
+
+  document.getElementById('noteHistory')?.addEventListener('click', () => {
+    openHistoryPanel().catch((err) => toast(err.message, true));
+  });
+  document.getElementById('noteHistoryClose')?.addEventListener('click', closeHistoryPanel);
 
   document.getElementById('notesEditor').addEventListener('submit', async (e) => {
     e.preventDefault();

@@ -1051,6 +1051,103 @@ html[data-theme="light"] .toast.error { color: #b91c1c; }
   gap: 8px;
   flex-shrink: 0;
 }
+.notes-history-panel {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.notes-history-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.notes-history-hint {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  flex: 1;
+}
+.notes-history-list {
+  max-height: 220px;
+  overflow: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.notes-history-empty {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  padding: 12px 8px;
+  text-align: center;
+}
+.notes-history-item {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.notes-history-item-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.notes-history-item-main {
+  flex: 1;
+  min-width: 0;
+}
+.notes-history-title {
+  font-weight: 650;
+  font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.notes-history-preview {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.35;
+}
+.notes-history-meta {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+.notes-history-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.notes-history-body {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  max-height: 180px;
+  overflow: auto;
+}
+.notes-history-body pre {
+  margin: 0.5em 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.22);
+  overflow-x: auto;
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+}
 .notes-toolbar {
   display: flex;
   flex-wrap: wrap;

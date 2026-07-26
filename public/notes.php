@@ -76,9 +76,18 @@ $isAdmin = Auth::isAdmin();
         <div class="notes-editor-top">
           <input class="notes-title-input" id="noteTitle" maxlength="200" placeholder="Title" required>
           <div class="notes-editor-actions">
+            <button type="button" class="btn btn-sm hidden" id="noteHistory">History</button>
             <button type="button" class="btn btn-sm btn-danger hidden" id="noteDelete">Delete</button>
             <button type="submit" class="btn btn-sm btn-primary" id="noteSave">Save</button>
           </div>
+        </div>
+        <div class="notes-history-panel hidden" id="noteHistoryPanel">
+          <div class="notes-history-head">
+            <strong>Version history</strong>
+            <span class="notes-history-hint">Last 5 title/body snapshots</span>
+            <button type="button" class="btn btn-sm btn-ghost" id="noteHistoryClose" aria-label="Close history">×</button>
+          </div>
+          <div class="notes-history-list" id="noteHistoryList"></div>
         </div>
         <div class="notes-toolbar" id="notesToolbar">
           <button type="button" class="btn btn-sm" data-cmd="bold" title="Bold"><b>B</b></button>

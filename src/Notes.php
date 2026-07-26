@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 final class Notes
 {
+    public const MAX_VERSIONS = 5;
+
     public static function pdo(): PDO
     {
         return NotesDatabase::connection();
@@ -412,6 +414,146 @@ final class Notes
         $stmt = self::pdo()->prepare('UPDATE notes SET owner_id = ? WHERE owner_id = ?');
         $stmt->execute([$toUserId, $fromUserId]);
         return $stmt->rowCount();
+    }
+
+    public static function contentChanged(array $existing, string $title, string $bodyHtml): bool
+    {
+        return (string) ($existing['title'] ?? '') !== $title
+            || (string) ($existing['body_html'] ?? '') !== $bodyHtml;
+    }
+
+    /**
+     * Snapshot current title/body before overwrite.
+     *
+     * @param array{title?: string, body_html?: string} $note
+     */
+    public static function snapshotVersion(int $noteId, array $note, ?int $byUserId = null): int
+    {
+        if ($noteId <= 0) {
+            return 0;
+        }
+        $stmt = self::pdo()->prepare(
+            'INSERT INTO note_versions (note_id, title, body_html, created_by, created_at)
+             VALUES (?, ?, ?, ?, datetime(\'now\'))'
+        );
+        $stmt->execute([
+            $noteId,
+            (string) ($note['title'] ?? ''),
+            (string) ($note['body_html'] ?? ''),
+            $byUserId !== null && $byUserId > 0 ? $byUserId : null,
+        ]);
+        return (int) self::pdo()->lastInsertId();
+    }
+
+    public static function pruneVersions(int $noteId): void
+    {
+        if ($noteId <= 0) {
+            return;
+        }
+        $pdo = self::pdo();
+        $keep = self::MAX_VERSIONS;
+        $pdo->prepare(
+            'DELETE FROM note_versions
+             WHERE note_id = ?
+               AND id NOT IN (
+                 SELECT id FROM (
+                   SELECT id FROM note_versions
+                   WHERE note_id = ?
+                   ORDER BY id DESC
+                   LIMIT ' . (int) $keep . '
+                 ) AS keep_ids
+               )'
+        )->execute([$noteId, $noteId]);
+    }
+
+    /**
+     * @return list<array{id:int,note_id:int,title:string,preview:string,created_at:string,created_by:?int,created_by_name:?string}>
+     */
+    public static function listVersions(int $noteId): array
+    {
+        $stmt = self::pdo()->prepare(
+            'SELECT id, note_id, title, body_html, created_at, created_by
+             FROM note_versions
+             WHERE note_id = ?
+             ORDER BY id DESC
+             LIMIT ' . (int) self::MAX_VERSIONS
+        );
+        $stmt->execute([$noteId]);
+        $rows = $stmt->fetchAll();
+        $userMap = TeamCal::portalUserMap();
+        $out = [];
+        foreach ($rows as $row) {
+            $by = $row['created_by'] !== null ? (int) $row['created_by'] : null;
+            $out[] = [
+                'id' => (int) $row['id'],
+                'note_id' => (int) $row['note_id'],
+                'title' => (string) ($row['title'] ?? ''),
+                'preview' => self::plainPreview((string) ($row['body_html'] ?? '')),
+                'created_at' => (string) ($row['created_at'] ?? ''),
+                'created_by' => $by,
+                'created_by_name' => $by !== null
+                    ? ($userMap[$by] ?? 'Deleted user')
+                    : null,
+            ];
+        }
+        return $out;
+    }
+
+    public static function loadVersion(int $noteId, int $versionId): ?array
+    {
+        $stmt = self::pdo()->prepare(
+            'SELECT id, note_id, title, body_html, created_at, created_by
+             FROM note_versions
+             WHERE note_id = ? AND id = ?'
+        );
+        $stmt->execute([$noteId, $versionId]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            return null;
+        }
+        $by = $row['created_by'] !== null ? (int) $row['created_by'] : null;
+        $userMap = TeamCal::portalUserMap();
+        return [
+            'id' => (int) $row['id'],
+            'note_id' => (int) $row['note_id'],
+            'title' => (string) ($row['title'] ?? ''),
+            'body_html' => (string) ($row['body_html'] ?? ''),
+            'preview' => self::plainPreview((string) ($row['body_html'] ?? '')),
+            'created_at' => (string) ($row['created_at'] ?? ''),
+            'created_by' => $by,
+            'created_by_name' => $by !== null
+                ? ($userMap[$by] ?? 'Deleted user')
+                : null,
+        ];
+    }
+
+    /**
+     * Restore title/body from a version. Snapshots current content first if it differs.
+     *
+     * @return array|null Restored note or null if version missing
+     */
+    public static function restoreVersion(int $noteId, int $versionId, ?int $byUserId = null): ?array
+    {
+        $note = self::loadNote($noteId);
+        $version = self::loadVersion($noteId, $versionId);
+        if (!$note || !$version) {
+            return null;
+        }
+
+        if (self::contentChanged($note, $version['title'], $version['body_html'])) {
+            self::snapshotVersion($noteId, $note, $byUserId);
+        }
+
+        self::pdo()->prepare(
+            'UPDATE notes SET title = ?, body_html = ?, updated_at = datetime(\'now\') WHERE id = ?'
+        )->execute([
+            $version['title'],
+            $version['body_html'],
+            $noteId,
+        ]);
+        self::pruneVersions($noteId);
+
+        return self::loadNote($noteId);
     }
 
     public static function loadNote(int $id): ?array

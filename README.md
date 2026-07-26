@@ -36,6 +36,8 @@ Compose mounts (data + live code):
 | `./public` | `/var/www/html/public` |
 | `./src` | `/var/www/html/src` |
 
+**Timezone:** container `TZ` defaults to `Asia/Hong_Kong` (override with `TZ=...` in `.env` or the environment). DB timestamps from SQLite `datetime('now')` are **UTC**; the Notes UI converts them to the browser’s local time.
+
 PHP/JS/CSS edits under `public/` and `src/` apply without rebuilding. Rebuild when you change `Dockerfile`, `docker-entrypoint.sh`, or image-only files.
 
 ### Docker run
@@ -240,12 +242,13 @@ Optional personal/shared notes (`/notes.php`). **Off by default.** **Login users
 - Rich text body — toolbar: bold, italic, underline, **font color**, lists, heading, quote, **code block**, link, clear formatting  
 - **Hashtags:** multiple chips per note (type + Enter or comma); up to 20; letters, numbers, `_`, `-` (optional leading `#`)  
 - Visibility: **private** (owner + admin) or **share** (selected groups + owner + admin)  
+- **Version history:** last **5** title/body snapshots on save (when content changes); **History** → preview / **Restore** (tags & visibility stay current)  
 - No public notes  
 
 **Storage**
 
 - `data/notes.db` (separate from portal and teamcal DBs)  
-- Schema reference: `sql/notes_schema.sql` (includes `tags` + `note_tags`)  
+- Schema reference: `sql/notes_schema.sql` (includes `tags`, `note_tags`, `note_versions`)  
 - HTML body is sanitized server-side (allowlisted tags; safe `color` on text only)  
 
 ### Authentication
@@ -319,7 +322,7 @@ Optional personal/shared notes (`/notes.php`). **Off by default.** **Login users
 |------|---------|
 | `data/portal.db` | Users, groups, tabs, categories, bookmarks |
 | `data/teamcal.db` | Team Calendar settings + events |
-| `data/notes.db` | Notes settings, notes, tags |
+| `data/notes.db` | Notes settings, notes, tags, versions |
 | `data/teamcal/event_types.json` | Event type dropdown list |
 | `data/teamcal/locations.json` | Location dropdown list |
 | `data/teamcal/holidays.json` | Holiday dates (from holiday ICS) |
@@ -346,6 +349,7 @@ Portal/
 │   │   ├── users.php
 │   │   ├── notes/
 │   │   │   ├── notes.php
+│   │   │   ├── versions.php
 │   │   │   ├── meta.php
 │   │   │   └── settings.php
 │   │   └── teamcal/
