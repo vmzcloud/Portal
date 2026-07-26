@@ -344,6 +344,38 @@ if ($teamcalLocationsJson === false) {
     </section>
   </div>
 
+  <div class="modal-backdrop" id="deleteUserModal" role="dialog" aria-modal="true" aria-labelledby="deleteUserModalTitle">
+    <div class="modal" style="width:min(440px,100%)">
+      <h2 id="deleteUserModalTitle">Delete user</h2>
+      <p id="deleteUserModalBody" style="margin:0 0 14px;color:var(--text-muted);font-size:0.92rem;line-height:1.45"></p>
+      <div class="form-group">
+        <label>What should happen to their notes?</label>
+        <div class="radio-list" style="display:flex;flex-direction:column;gap:8px;margin-top:6px">
+          <label style="display:flex;gap:8px;align-items:flex-start;margin:0;cursor:pointer">
+            <input type="radio" name="deleteUserNotesAction" value="delete" style="margin-top:3px">
+            <span><strong>Delete all notes</strong><br><span style="color:var(--text-muted);font-size:0.85rem">Remove every note owned by this user</span></span>
+          </label>
+          <label style="display:flex;gap:8px;align-items:flex-start;margin:0;cursor:pointer">
+            <input type="radio" name="deleteUserNotesAction" value="reassign" style="margin-top:3px">
+            <span><strong>Reassign notes to me</strong><br><span style="color:var(--text-muted);font-size:0.85rem">Transfer ownership to your admin account</span></span>
+          </label>
+          <label style="display:flex;gap:8px;align-items:flex-start;margin:0;cursor:pointer">
+            <input type="radio" name="deleteUserNotesAction" value="keep" checked style="margin-top:3px">
+            <span><strong>Keep notes</strong><br><span style="color:var(--text-muted);font-size:0.85rem">Leave notes; owner shown as “Deleted user”</span></span>
+          </label>
+        </div>
+      </div>
+      <p style="margin:12px 0 0;color:var(--text-muted);font-size:0.85rem;line-height:1.4">
+        Bookmarks are always deleted. Private calendar events owned by this user are always deleted.
+        Public/shared events are kept. They are removed from event people lists.
+      </p>
+      <div class="form-actions" style="margin-top:18px">
+        <button type="button" class="btn btn-ghost" id="deleteUserCancel">Cancel</button>
+        <button type="button" class="btn btn-danger" id="deleteUserConfirm">Delete user</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="eventModal" role="dialog" aria-modal="true">
     <div class="modal cal-modal">
       <h2 id="eventModalTitle">Add event</h2>

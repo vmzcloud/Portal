@@ -57,6 +57,86 @@ final class Notes
         }
     }
 
+    public static function normalizeTagName(string $raw): ?string
+    {
+        $name = mb_strtolower(trim($raw));
+        if (str_starts_with($name, '#')) {
+            $name = ltrim($name, '#');
+        }
+        $name = trim($name);
+        if ($name === '' || mb_strlen($name) > 40) {
+            return null;
+        }
+        if (!preg_match('/^[a-z0-9][a-z0-9_-]*$/u', $name)) {
+            return null;
+        }
+        return $name;
+    }
+
+    /**
+     * @param list<mixed> $raw
+     * @return list<string>
+     */
+    public static function normalizeTagList(array $raw): array
+    {
+        $out = [];
+        foreach ($raw as $item) {
+            if (!is_string($item) && !is_numeric($item)) {
+                continue;
+            }
+            $name = self::normalizeTagName((string) $item);
+            if ($name === null) {
+                continue;
+            }
+            $out[$name] = $name;
+            if (count($out) >= 20) {
+                break;
+            }
+        }
+        return array_values($out);
+    }
+
+    /** @return list<string> */
+    public static function fetchTags(int $noteId): array
+    {
+        $stmt = self::pdo()->prepare(
+            'SELECT t.name FROM tags t
+             INNER JOIN note_tags nt ON nt.tag_id = t.id
+             WHERE nt.note_id = ?
+             ORDER BY t.name COLLATE NOCASE'
+        );
+        $stmt->execute([$noteId]);
+        return array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
+
+    /**
+     * @param list<string> $names Already normalized tag names
+     */
+    public static function syncTags(int $noteId, array $names): void
+    {
+        $pdo = self::pdo();
+        $pdo->prepare('DELETE FROM note_tags WHERE note_id = ?')->execute([$noteId]);
+        if ($names === []) {
+            return;
+        }
+
+        $find = $pdo->prepare('SELECT id FROM tags WHERE name = ?');
+        $create = $pdo->prepare('INSERT INTO tags (name) VALUES (?)');
+        $link = $pdo->prepare('INSERT OR IGNORE INTO note_tags (note_id, tag_id) VALUES (?, ?)');
+
+        foreach ($names as $name) {
+            $find->execute([$name]);
+            $tagId = $find->fetchColumn();
+            if ($tagId === false) {
+                $create->execute([$name]);
+                $tagId = (int) $pdo->lastInsertId();
+            } else {
+                $tagId = (int) $tagId;
+            }
+            $link->execute([$noteId, $tagId]);
+        }
+    }
+
     public static function canViewNote(array $note, ?array $user, array $userGroupIds): bool
     {
         if (!$user) {
@@ -106,7 +186,7 @@ final class Notes
         }
 
         $allowed = [
-            'p', 'br', 'div', 'span', 'b', 'strong', 'i', 'em', 'u', 's',
+            'p', 'br', 'div', 'span', 'font', 'b', 'strong', 'i', 'em', 'u', 's',
             'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'blockquote', 'code', 'pre', 'a',
         ];
 
@@ -194,13 +274,35 @@ final class Notes
                     }
                     continue;
                 }
+                if (($tag === 'span' || $tag === 'font') && $lname === 'style') {
+                    $safe = self::sanitizeStyleColorOnly($child->getAttribute('style'));
+                    if ($safe !== null) {
+                        $child->setAttribute('style', $safe);
+                    } else {
+                        $child->removeAttribute('style');
+                    }
+                    continue;
+                }
+                if ($tag === 'font' && $lname === 'color') {
+                    $safeColor = self::sanitizeColorValue($child->getAttribute('color'));
+                    if ($safeColor !== null) {
+                        $child->setAttribute('color', $safeColor);
+                    } else {
+                        $child->removeAttribute('color');
+                    }
+                    continue;
+                }
                 if ($lname === 'class' || $lname === 'style') {
                     $child->removeAttribute($name);
                     continue;
                 }
-                if (!($tag === 'a' && ($lname === 'href' || $lname === 'rel' || $lname === 'target'))) {
-                    $child->removeAttribute($name);
+                if ($tag === 'a' && ($lname === 'href' || $lname === 'rel' || $lname === 'target')) {
+                    continue;
                 }
+                if ($tag === 'font' && $lname === 'color') {
+                    continue;
+                }
+                $child->removeAttribute($name);
             }
 
             self::sanitizeNode($child, $allowed);
@@ -211,6 +313,52 @@ final class Notes
                 $dead->parentNode->removeChild($dead);
             }
         }
+    }
+
+    public static function sanitizeColorValue(string $raw): ?string
+    {
+        $v = trim($raw);
+        if ($v === '') {
+            return null;
+        }
+        if (preg_match('/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i', $v)) {
+            return strtolower($v);
+        }
+        if (preg_match(
+            '/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*(0|0?\.\d+|1(?:\.0+)?))?\s*\)$/i',
+            $v,
+            $m
+        )) {
+            $r = (int) $m[1];
+            $g = (int) $m[2];
+            $b = (int) $m[3];
+            if ($r > 255 || $g > 255 || $b > 255) {
+                return null;
+            }
+            if (isset($m[4]) && $m[4] !== '') {
+                return sprintf('rgba(%d, %d, %d, %s)', $r, $g, $b, $m[4]);
+            }
+            return sprintf('rgb(%d, %d, %d)', $r, $g, $b);
+        }
+        return null;
+    }
+
+    public static function sanitizeStyleColorOnly(string $style): ?string
+    {
+        $parts = preg_split('/\s*;\s*/', trim($style)) ?: [];
+        foreach ($parts as $part) {
+            if ($part === '') {
+                continue;
+            }
+            if (!preg_match('/^color\s*:\s*(.+)$/i', $part, $m)) {
+                continue;
+            }
+            $color = self::sanitizeColorValue(trim($m[1]));
+            if ($color !== null) {
+                return 'color: ' . $color;
+            }
+        }
+        return null;
     }
 
     public static function plainPreview(string $html, int $max = 120): string
@@ -229,6 +377,7 @@ final class Notes
         $row['id'] = $id;
         $row['owner_id'] = (int) $row['owner_id'];
         $row['group_ids'] = self::fetchGroupIds($id);
+        $row['tags'] = self::fetchTags($id);
         $row['title'] = (string) ($row['title'] ?? '');
         $row['body_html'] = (string) ($row['body_html'] ?? '');
         $row['preview'] = self::plainPreview($row['body_html']);
@@ -236,9 +385,33 @@ final class Notes
         if ($userMap === null) {
             $userMap = TeamCal::portalUserMap();
         }
-        $row['owner_name'] = $userMap[$row['owner_id']] ?? ('user#' . $row['owner_id']);
+        $row['owner_name'] = $userMap[$row['owner_id']] ?? 'Deleted user';
 
         return $row;
+    }
+
+    public static function countByOwner(int $userId): int
+    {
+        $stmt = self::pdo()->prepare('SELECT COUNT(*) FROM notes WHERE owner_id = ?');
+        $stmt->execute([$userId]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    public static function deleteByOwner(int $userId): int
+    {
+        $stmt = self::pdo()->prepare('DELETE FROM notes WHERE owner_id = ?');
+        $stmt->execute([$userId]);
+        return $stmt->rowCount();
+    }
+
+    public static function reassignOwner(int $fromUserId, int $toUserId): int
+    {
+        if ($fromUserId <= 0 || $toUserId <= 0 || $fromUserId === $toUserId) {
+            return 0;
+        }
+        $stmt = self::pdo()->prepare('UPDATE notes SET owner_id = ? WHERE owner_id = ?');
+        $stmt->execute([$toUserId, $fromUserId]);
+        return $stmt->rowCount();
     }
 
     public static function loadNote(int $id): ?array
@@ -263,6 +436,9 @@ final class Notes
         $rows = $stmt->fetchAll();
         $userMap = TeamCal::portalUserMap();
         $q = mb_strtolower(trim($q));
+        if (str_starts_with($q, '#')) {
+            $q = ltrim($q, '#');
+        }
         $out = [];
         foreach ($rows as $row) {
             $note = self::enrichNote($row, $userMap);
@@ -270,7 +446,10 @@ final class Notes
                 continue;
             }
             if ($q !== '') {
-                $hay = mb_strtolower($note['title'] . ' ' . $note['preview'] . ' ' . strip_tags($note['body_html']));
+                $tags = is_array($note['tags'] ?? null) ? implode(' ', $note['tags']) : '';
+                $hay = mb_strtolower(
+                    $note['title'] . ' ' . $note['preview'] . ' ' . strip_tags($note['body_html']) . ' ' . $tags
+                );
                 if (!str_contains($hay, $q)) {
                     continue;
                 }

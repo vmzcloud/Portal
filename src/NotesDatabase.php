@@ -70,9 +70,25 @@ final class NotesDatabase
                 FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
             )'
         );
+        self::$pdo->exec(
+            'CREATE TABLE IF NOT EXISTS tags (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE
+            )'
+        );
+        self::$pdo->exec(
+            'CREATE TABLE IF NOT EXISTS note_tags (
+                note_id INTEGER NOT NULL,
+                tag_id INTEGER NOT NULL,
+                PRIMARY KEY (note_id, tag_id),
+                FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE,
+                FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+            )'
+        );
         self::$pdo->exec('CREATE INDEX IF NOT EXISTS idx_notes_owner ON notes(owner_id)');
         self::$pdo->exec('CREATE INDEX IF NOT EXISTS idx_notes_visibility ON notes(visibility)');
         self::$pdo->exec('CREATE INDEX IF NOT EXISTS idx_notes_updated ON notes(updated_at)');
+        self::$pdo->exec('CREATE INDEX IF NOT EXISTS idx_note_tags_tag ON note_tags(tag_id)');
 
         $stmt = self::$pdo->prepare('SELECT value FROM settings WHERE key = ?');
         $stmt->execute(['enabled']);

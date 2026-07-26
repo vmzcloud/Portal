@@ -128,6 +128,26 @@ if ($method === 'DELETE') {
         json_error('User not found', 404);
     }
 
+    $notesAction = strtolower(trim((string) ($body['notes_action'] ?? 'keep')));
+    if (!in_array($notesAction, ['delete', 'reassign', 'keep'], true)) {
+        json_error('Invalid notes_action (use delete, reassign, or keep)');
+    }
+
+    NotesDatabase::connection();
+    TeamCalDatabase::connection();
+
+    $notesAffected = 0;
+    if ($notesAction === 'delete') {
+        $notesAffected = Notes::deleteByOwner($id);
+    } elseif ($notesAction === 'reassign') {
+        $notesAffected = Notes::reassignOwner($id, (int) $admin['id']);
+    } else {
+        $notesAffected = Notes::countByOwner($id);
+    }
+
+    $privateEventsDeleted = TeamCal::deletePrivateEventsByOwner($id);
+    $personLinksRemoved = TeamCal::removePersonFromAllEvents($id);
+
     $icons = $pdo->prepare('SELECT icon_path FROM bookmarks WHERE owner_id = ?');
     $icons->execute([$id]);
     foreach ($icons->fetchAll(PDO::FETCH_COLUMN) as $path) {
@@ -144,7 +164,13 @@ if ($method === 'DELETE') {
         @rmdir($userUploadDir);
     }
 
-    json_ok(['id' => $id]);
+    json_ok([
+        'id' => $id,
+        'notes_action' => $notesAction,
+        'notes_affected' => $notesAffected,
+        'private_events_deleted' => $privateEventsDeleted,
+        'person_links_removed' => $personLinksRemoved,
+    ]);
 }
 
 json_error('Method not allowed', 405);

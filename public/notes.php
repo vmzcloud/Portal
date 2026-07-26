@@ -62,7 +62,7 @@ $isAdmin = Auth::isAdmin();
   <main class="notes-main" id="notesMain" data-view="list">
     <aside class="notes-sidebar" id="notesSidebar">
       <div class="notes-sidebar-head">
-        <input class="form-control" id="notesSearch" type="search" placeholder="Search notes…">
+        <input class="form-control" id="notesSearch" type="search" placeholder="Search notes or #tags…">
       </div>
       <div class="notes-list" id="notesList"></div>
     </aside>
@@ -84,15 +84,27 @@ $isAdmin = Auth::isAdmin();
           <button type="button" class="btn btn-sm" data-cmd="bold" title="Bold"><b>B</b></button>
           <button type="button" class="btn btn-sm" data-cmd="italic" title="Italic"><i>I</i></button>
           <button type="button" class="btn btn-sm" data-cmd="underline" title="Underline"><u>U</u></button>
+          <label class="notes-color-control" title="Font color">
+            <span class="notes-color-label" aria-hidden="true">A</span>
+            <input type="color" id="noteFontColor" value="#4fc3f7" aria-label="Font color">
+          </label>
           <button type="button" class="btn btn-sm" data-cmd="insertUnorderedList" title="Bullet list">• List</button>
           <button type="button" class="btn btn-sm" data-cmd="insertOrderedList" title="Numbered list">1. List</button>
           <button type="button" class="btn btn-sm" data-cmd="formatBlock" data-value="h2" title="Heading">H</button>
           <button type="button" class="btn btn-sm" data-cmd="formatBlock" data-value="blockquote" title="Quote">“”</button>
+          <button type="button" class="btn btn-sm" data-cmd="codeBlock" title="Code block">&lt;/&gt;</button>
           <button type="button" class="btn btn-sm" data-cmd="createLink" title="Link">Link</button>
           <button type="button" class="btn btn-sm" data-cmd="removeFormat" title="Clear formatting">Clear</button>
         </div>
         <div class="notes-body-editor" id="noteBody" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Note body" data-placeholder="Write your note…"></div>
         <div class="notes-meta-row">
+          <div class="form-group" style="margin:0;min-width:160px;flex:1">
+            <label for="noteTagInput">Hashtags</label>
+            <div class="notes-tags-input" id="noteTags">
+              <div class="notes-tags-chips" id="noteTagsChips"></div>
+              <input class="notes-tags-field" id="noteTagInput" type="text" maxlength="40" placeholder="Add #tag…" autocomplete="off">
+            </div>
+          </div>
           <div class="form-group" style="margin:0;min-width:160px">
             <label for="noteVisibility">Visibility</label>
             <select class="form-control" id="noteVisibility">
@@ -109,7 +121,12 @@ $isAdmin = Auth::isAdmin();
       </form>
     </section>
 
-    <section class="notes-cards hidden" id="notesCards"></section>
+    <section class="notes-cards-wrap hidden" id="notesCardsWrap">
+      <div class="notes-cards-head">
+        <input class="form-control" id="notesCardsSearch" type="search" placeholder="Search notes or #tags…">
+      </div>
+      <div class="notes-cards" id="notesCards"></div>
+    </section>
   </main>
 
   <div class="toast" id="toast"></div>

@@ -9,7 +9,7 @@ NotesDatabase::connection();
 $pdo = Notes::pdo();
 
 /**
- * @return array{title: string, body_html: string, visibility: string, group_ids: list<int>}
+ * @return array{title: string, body_html: string, visibility: string, group_ids: list<int>, tags: list<string>}
  */
 function notes_validate_payload(array $body): array
 {
@@ -47,11 +47,18 @@ function notes_validate_payload(array $body): array
         $groupIds = [];
     }
 
+    $rawTags = $body['tags'] ?? [];
+    if (!is_array($rawTags)) {
+        $rawTags = [];
+    }
+    $tags = Notes::normalizeTagList($rawTags);
+
     return [
         'title' => $title,
         'body_html' => $bodyHtml,
         'visibility' => $visibility,
         'group_ids' => $groupIds,
+        'tags' => $tags,
     ];
 }
 
@@ -101,6 +108,7 @@ if ($method === 'POST') {
     ]);
     $id = (int) $pdo->lastInsertId();
     Notes::syncGroups($id, $data['group_ids']);
+    Notes::syncTags($id, $data['tags']);
 
     $note = Notes::loadNote($id);
     $note['can_edit'] = true;
@@ -128,6 +136,7 @@ if ($method === 'PUT' || $method === 'PATCH') {
         $id,
     ]);
     Notes::syncGroups($id, $data['group_ids']);
+    Notes::syncTags($id, $data['tags']);
 
     $note = Notes::loadNote($id);
     $note['can_edit'] = true;

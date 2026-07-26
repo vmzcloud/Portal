@@ -228,22 +228,25 @@ Optional personal/shared notes (`/notes.php`). **Off by default.** **Login users
 **UI**
 
 - **List** view (default): sidebar of notes + main editor  
-- **Cards** view: card grid; click opens editor overlay  
-- Search filters the list  
+- **Cards** view: card grid with its own search bar; click a card opens the editor overlay  
+- **Search** (list and cards): filters by title, body, and hashtags (`work` or `#work`)  
+- Click a hashtag chip on a note to filter by that tag  
+- Search query stays in sync when switching list ↔ cards  
 - View mode remembered in the browser  
 
 **Note fields**
 
 - Title  
-- Rich text body (toolbar: bold, italic, underline, lists, heading, quote, link)  
+- Rich text body — toolbar: bold, italic, underline, **font color**, lists, heading, quote, **code block**, link, clear formatting  
+- **Hashtags:** multiple chips per note (type + Enter or comma); up to 20; letters, numbers, `_`, `-` (optional leading `#`)  
 - Visibility: **private** (owner + admin) or **share** (selected groups + owner + admin)  
 - No public notes  
 
 **Storage**
 
 - `data/notes.db` (separate from portal and teamcal DBs)  
-- Schema reference: `sql/notes_schema.sql`  
-- HTML body is sanitized server-side (allowlisted tags only)  
+- Schema reference: `sql/notes_schema.sql` (includes `tags` + `note_tags`)  
+- HTML body is sanitized server-side (allowlisted tags; safe `color` on text only)  
 
 ### Authentication
 
@@ -260,6 +263,15 @@ Optional personal/shared notes (`/notes.php`). **Off by default.** **Login users
 - **Users:** create, delete, reset password, activate/deactivate, force password change, **change role** (`user` ↔ `admin`)  
   - Cannot demote, deactivate, or delete your own admin account  
   - Role changes apply after the target user logs in again  
+  - **Deleting a user** opens a confirmation dialog:  
+    | Content | Behavior |
+    |---------|----------|
+    | Bookmarks | Always deleted |
+    | **Notes** | Choose: **Delete all** / **Reassign to me** / **Keep** |
+    | **Private** calendar events owned by the user | Always deleted |
+    | Public / share events owned by the user | Kept (owner shown as **Deleted user**) |
+    | Event people lists | User removed from all events |
+  - Kept orphan notes/events show owner as **Deleted user**; admin can still edit/delete them  
 - **Groups:** create/edit/delete groups, assign members (for **share** bookmarks / events / notes)  
 - **Events** (Team Calendar list management — admin only):  
   - Table of events with **Edit** / **Delete** and **+ Event** (same modal form as the week view)  
@@ -307,7 +319,7 @@ Optional personal/shared notes (`/notes.php`). **Off by default.** **Login users
 |------|---------|
 | `data/portal.db` | Users, groups, tabs, categories, bookmarks |
 | `data/teamcal.db` | Team Calendar settings + events |
-| `data/notes.db` | Notes settings + notes |
+| `data/notes.db` | Notes settings, notes, tags |
 | `data/teamcal/event_types.json` | Event type dropdown list |
 | `data/teamcal/locations.json` | Location dropdown list |
 | `data/teamcal/holidays.json` | Holiday dates (from holiday ICS) |

@@ -364,6 +364,28 @@ final class TeamCal
         }
     }
 
+    public static function deletePrivateEventsByOwner(int $userId): int
+    {
+        if ($userId <= 0) {
+            return 0;
+        }
+        $stmt = self::pdo()->prepare(
+            'DELETE FROM events WHERE owner_id = ? AND visibility = ?'
+        );
+        $stmt->execute([$userId, 'private']);
+        return $stmt->rowCount();
+    }
+
+    public static function removePersonFromAllEvents(int $userId): int
+    {
+        if ($userId <= 0) {
+            return 0;
+        }
+        $stmt = self::pdo()->prepare('DELETE FROM event_persons WHERE user_id = ?');
+        $stmt->execute([$userId]);
+        return $stmt->rowCount();
+    }
+
     /**
      * Admin event list with filters. Returns ['events' => ..., 'truncated' => bool, 'count' => int].
      *
@@ -519,12 +541,12 @@ final class TeamCal
             if (isset($userMap[$uid])) {
                 $persons[] = ['id' => $uid, 'username' => $userMap[$uid]];
             } else {
-                $persons[] = ['id' => $uid, 'username' => 'user#' . $uid];
+                $persons[] = ['id' => $uid, 'username' => 'Deleted user'];
             }
         }
         $row['persons'] = $persons;
         $row['owner_name'] = $row['owner_id'] !== null
-            ? ($userMap[$row['owner_id']] ?? ('user#' . $row['owner_id']))
+            ? ($userMap[$row['owner_id']] ?? 'Deleted user')
             : null;
 
         return $row;

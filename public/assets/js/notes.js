@@ -7,6 +7,8 @@
   let groups = [];
   let selectedId = null;
   let viewMode = 'list';
+  let editorTags = [];
+  let tagsLocked = false;
 
   function toast(msg, isError = false) {
     toastEl.textContent = msg;
@@ -69,7 +71,7 @@
     main.dataset.view = viewMode;
     document.getElementById('notesSidebar').classList.toggle('hidden', viewMode === 'cards');
     document.getElementById('notesEditorPane').classList.toggle('hidden', viewMode === 'cards' && !selectedId);
-    document.getElementById('notesCards').classList.toggle('hidden', viewMode !== 'cards');
+    document.getElementById('notesCardsWrap').classList.toggle('hidden', viewMode !== 'cards');
 
     document.getElementById('notesViewList').classList.toggle('btn-primary', viewMode === 'list');
     document.getElementById('notesViewCards').classList.toggle('btn-primary', viewMode === 'cards');
@@ -101,12 +103,131 @@
     `).join('') || '<div style="color:var(--text-muted);font-size:0.85rem">No groups</div>';
   }
 
+  function normalizeTag(raw) {
+    let name = String(raw ?? '').trim().toLowerCase();
+    if (name.startsWith('#')) name = name.replace(/^#+/, '');
+    name = name.trim();
+    if (!name || name.length > 40) return null;
+    if (!/^[a-z0-9][a-z0-9_-]*$/.test(name)) return null;
+    return name;
+  }
+
+  function renderEditorTags() {
+    const box = document.getElementById('noteTagsChips');
+    box.innerHTML = editorTags.map((t) => `
+      <span class="notes-tag-chip" data-tag="${esc(t)}">
+        #${esc(t)}
+        ${tagsLocked ? '' : `<button type="button" class="notes-tag-remove" data-tag="${esc(t)}" aria-label="Remove #${esc(t)}">×</button>`}
+      </span>
+    `).join('');
+    box.querySelectorAll('.notes-tag-remove').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (tagsLocked) return;
+        const tag = btn.dataset.tag;
+        editorTags = editorTags.filter((t) => t !== tag);
+        renderEditorTags();
+      });
+    });
+  }
+
+  function setEditorTags(tags = []) {
+    const seen = new Set();
+    editorTags = [];
+    for (const raw of tags) {
+      const name = normalizeTag(raw);
+      if (!name || seen.has(name)) continue;
+      seen.add(name);
+      editorTags.push(name);
+      if (editorTags.length >= 20) break;
+    }
+    renderEditorTags();
+  }
+
+  function addEditorTag(raw) {
+    const name = normalizeTag(raw);
+    if (!name || tagsLocked) return false;
+    if (editorTags.includes(name)) return false;
+    if (editorTags.length >= 20) {
+      toast('Maximum 20 hashtags', true);
+      return false;
+    }
+    editorTags.push(name);
+    renderEditorTags();
+    return true;
+  }
+
+  function tagsHtml(tags = []) {
+    if (!tags.length) return '';
+    return `<span class="notes-tags-inline">${tags.map((t) =>
+      `<span class="notes-tag-chip notes-tag-filter" data-tag="${esc(t)}">#${esc(t)}</span>`
+    ).join('')}</span>`;
+  }
+
+  function getSearchQuery() {
+    const list = document.getElementById('notesSearch');
+    const cards = document.getElementById('notesCardsSearch');
+    const q = (viewMode === 'cards' ? cards : list)?.value ?? list?.value ?? '';
+    return String(q).trim();
+  }
+
+  function setSearchQuery(q) {
+    const val = String(q ?? '');
+    const list = document.getElementById('notesSearch');
+    const cards = document.getElementById('notesCardsSearch');
+    if (list) list.value = val;
+    if (cards) cards.value = val;
+  }
+
+  function filterByTag(tag) {
+    const name = normalizeTag(tag);
+    if (!name) return;
+    setSearchQuery(`#${name}`);
+    loadNotes(`#${name}`).catch((err) => toast(err.message, true));
+  }
+
+  function bindTagFilters(root) {
+    root.querySelectorAll('.notes-tag-filter').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        filterByTag(el.dataset.tag);
+      });
+    });
+  }
+
   function syncVisibilityUi() {
     const share = document.getElementById('noteVisibility').value === 'share';
     document.getElementById('noteGroupsWrap').classList.toggle('hidden', !share);
   }
 
   document.getElementById('noteVisibility').addEventListener('change', syncVisibilityUi);
+
+  const noteTagInput = document.getElementById('noteTagInput');
+  noteTagInput.addEventListener('keydown', (e) => {
+    if (tagsLocked) return;
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      const v = noteTagInput.value;
+      if (addEditorTag(v)) noteTagInput.value = '';
+      else if (v.trim()) toast('Invalid hashtag (letters, numbers, _ -)', true);
+      return;
+    }
+    if (e.key === 'Backspace' && !noteTagInput.value && editorTags.length) {
+      editorTags.pop();
+      renderEditorTags();
+    }
+  });
+  noteTagInput.addEventListener('blur', () => {
+    if (tagsLocked) return;
+    const v = noteTagInput.value;
+    if (!v.trim()) return;
+    if (addEditorTag(v)) noteTagInput.value = '';
+  });
+  document.getElementById('noteTags').addEventListener('click', () => {
+    if (!tagsLocked) noteTagInput.focus();
+  });
 
   function showEmpty() {
     document.getElementById('notesEmpty').classList.remove('hidden');
@@ -115,12 +236,68 @@
   }
 
   function lockEditor(lock) {
+    tagsLocked = !!lock;
     document.getElementById('noteTitle').disabled = !!lock;
     document.getElementById('noteBody').contentEditable = lock ? 'false' : 'true';
     document.getElementById('noteVisibility').disabled = !!lock;
     document.getElementById('noteSave').classList.toggle('hidden', !!lock);
+    document.getElementById('noteTagInput').disabled = !!lock;
+    document.getElementById('noteTags').classList.toggle('is-locked', !!lock);
     document.querySelectorAll('#notesToolbar button').forEach((b) => { b.disabled = !!lock; });
+    const colorInput = document.getElementById('noteFontColor');
+    if (colorInput) colorInput.disabled = !!lock;
     document.querySelectorAll('#noteGroups input').forEach((b) => { b.disabled = !!lock; });
+    renderEditorTags();
+  }
+
+  function escapeHtml(s) {
+    return String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function insertCodeBlock() {
+    const body = document.getElementById('noteBody');
+    body.focus();
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    if (!body.contains(range.commonAncestorContainer)) return;
+
+    let text = range.toString();
+    if (!text) text = '';
+    const html = `<pre><code>${escapeHtml(text) || '<br>'}</code></pre><p><br></p>`;
+    range.deleteContents();
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    const frag = document.createDocumentFragment();
+    let node;
+    let last = null;
+    while ((node = tmp.firstChild)) {
+      last = frag.appendChild(node);
+    }
+    range.insertNode(frag);
+    if (last) {
+      const code = last.previousSibling?.querySelector?.('code') || last.querySelector?.('code');
+      if (code) {
+        const r = document.createRange();
+        r.selectNodeContents(code);
+        r.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(r);
+      }
+    }
+  }
+
+  function applyFontColor(color) {
+    const body = document.getElementById('noteBody');
+    body.focus();
+    try {
+      document.execCommand('styleWithCSS', false, true);
+    } catch { /* ignore */ }
+    document.execCommand('foreColor', false, color);
   }
 
   function loadNoteIntoEditor(note) {
@@ -132,6 +309,8 @@
     document.getElementById('noteBody').innerHTML = note?.body_html || '';
     document.getElementById('noteVisibility').value = note?.visibility === 'share' ? 'share' : 'private';
     fillGroups(note?.group_ids || []);
+    setEditorTags(note?.tags || []);
+    noteTagInput.value = '';
     syncVisibilityUi();
 
     const canEdit = !note || note.can_edit !== false;
@@ -179,6 +358,7 @@
       <button type="button" class="notes-list-item ${String(n.id) === String(selectedId) ? 'active' : ''}" data-id="${n.id}">
         <span class="notes-list-title">${esc(n.title || 'Untitled')}</span>
         <span class="notes-list-preview">${esc(n.preview || '')}</span>
+        ${tagsHtml(n.tags || [])}
         <span class="notes-list-meta">
           <span class="badge ${esc(n.visibility)}">${esc(n.visibility)}</span>
           <span>${esc(fmtWhen(n.updated_at))}</span>
@@ -189,6 +369,7 @@
     box.querySelectorAll('.notes-list-item').forEach((btn) => {
       btn.addEventListener('click', () => showEditorFor(Number(btn.dataset.id)));
     });
+    bindTagFilters(box);
   }
 
   function renderCards() {
@@ -201,6 +382,7 @@
       <button type="button" class="notes-card ${String(n.id) === String(selectedId) ? 'active' : ''}" data-id="${n.id}">
         <div class="notes-card-title">${esc(n.title || 'Untitled')}</div>
         <div class="notes-card-preview">${esc(n.preview || '—')}</div>
+        ${tagsHtml(n.tags || [])}
         <div class="notes-card-meta">
           <span class="badge ${esc(n.visibility)}">${esc(n.visibility)}</span>
           <span>${esc(fmtWhen(n.updated_at))}</span>
@@ -211,6 +393,7 @@
     box.querySelectorAll('.notes-card').forEach((btn) => {
       btn.addEventListener('click', () => showEditorFor(Number(btn.dataset.id)));
     });
+    bindTagFilters(box);
   }
 
   function renderAll() {
@@ -236,12 +419,19 @@
   }
 
   let searchTimer = null;
-  document.getElementById('notesSearch').addEventListener('input', (e) => {
+  function onSearchInput(e) {
+    const q = e.target.value;
+    const list = document.getElementById('notesSearch');
+    const cards = document.getElementById('notesCardsSearch');
+    if (e.target !== list && list) list.value = q;
+    if (e.target !== cards && cards) cards.value = q;
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
-      loadNotes(e.target.value.trim()).catch((err) => toast(err.message, true));
+      loadNotes(String(q).trim()).catch((err) => toast(err.message, true));
     }, 250);
-  });
+  }
+  document.getElementById('notesSearch').addEventListener('input', onSearchInput);
+  document.getElementById('notesCardsSearch').addEventListener('input', onSearchInput);
 
   document.getElementById('notesViewList').addEventListener('click', () => setView('list'));
   document.getElementById('notesViewCards').addEventListener('click', () => setView('cards'));
@@ -254,6 +444,7 @@
       body_html: '',
       visibility: 'private',
       group_ids: [],
+      tags: [],
       can_edit: true,
     });
     document.getElementById('noteId').value = '';
@@ -296,8 +487,23 @@
       document.execCommand('formatBlock', false, btn.dataset.value || 'p');
       return;
     }
+    if (cmd === 'codeBlock') {
+      insertCodeBlock();
+      return;
+    }
     document.execCommand(cmd, false, null);
   });
+
+  const noteFontColor = document.getElementById('noteFontColor');
+  const noteColorLabel = document.querySelector('.notes-color-label');
+  noteFontColor?.addEventListener('input', (e) => {
+    if (e.target.disabled) return;
+    if (noteColorLabel) noteColorLabel.style.borderBottomColor = e.target.value;
+    applyFontColor(e.target.value);
+  });
+  if (noteFontColor && noteColorLabel) {
+    noteColorLabel.style.borderBottomColor = noteFontColor.value;
+  }
 
   document.getElementById('notesEditor').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -306,8 +512,13 @@
     const body_html = document.getElementById('noteBody').innerHTML;
     const visibility = document.getElementById('noteVisibility').value;
     const group_ids = [...document.querySelectorAll('#noteGroups input:checked')].map((x) => Number(x.value));
+    if (noteTagInput.value.trim()) {
+      addEditorTag(noteTagInput.value);
+      noteTagInput.value = '';
+    }
+    const tags = [...editorTags];
 
-    const payload = { title, body_html, visibility, group_ids };
+    const payload = { title, body_html, visibility, group_ids, tags };
     try {
       let saved;
       if (id) {
@@ -318,7 +529,7 @@
         saved = await api('/api/notes/notes.php', { method: 'POST', body: payload });
         toast('Note created');
       }
-      await loadNotes(document.getElementById('notesSearch').value.trim());
+      await loadNotes(getSearchQuery());
       selectedId = saved.id;
       showEditorFor(saved.id);
     } catch (err) {
@@ -333,7 +544,7 @@
       await api('/api/notes/notes.php', { method: 'DELETE', body: { id } });
       toast('Note deleted');
       selectedId = null;
-      await loadNotes(document.getElementById('notesSearch').value.trim());
+      await loadNotes(getSearchQuery());
       if (viewMode === 'list') showEmpty();
       else {
         document.getElementById('notesEditorPane').classList.add('hidden');

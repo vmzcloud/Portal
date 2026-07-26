@@ -132,6 +132,57 @@
     if (e.target.id === 'eventModal') closeEventModal();
   });
 
+  let pendingDeleteUserId = null;
+
+  function openDeleteUserModal(id, username) {
+    pendingDeleteUserId = id;
+    const body = document.getElementById('deleteUserModalBody');
+    body.innerHTML = `Delete <strong>${esc(username)}</strong>? Bookmarks will be removed. Choose what to do with their notes.`;
+    const keep = document.querySelector('input[name="deleteUserNotesAction"][value="keep"]');
+    if (keep) keep.checked = true;
+    document.getElementById('deleteUserModal').classList.add('open');
+  }
+
+  function closeDeleteUserModal() {
+    pendingDeleteUserId = null;
+    document.getElementById('deleteUserModal')?.classList.remove('open');
+  }
+
+  document.getElementById('deleteUserCancel')?.addEventListener('click', closeDeleteUserModal);
+  document.getElementById('deleteUserModal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'deleteUserModal') closeDeleteUserModal();
+  });
+  document.getElementById('deleteUserConfirm')?.addEventListener('click', async () => {
+    const id = pendingDeleteUserId;
+    if (!id) return;
+    const selected = document.querySelector('input[name="deleteUserNotesAction"]:checked');
+    const notes_action = selected?.value || 'keep';
+    const btn = document.getElementById('deleteUserConfirm');
+    btn.disabled = true;
+    try {
+      const result = await api('/api/users.php', {
+        method: 'DELETE',
+        body: { id, notes_action },
+      });
+      closeDeleteUserModal();
+      const parts = ['User deleted'];
+      if (notes_action === 'delete' && result?.notes_affected) {
+        parts.push(`${result.notes_affected} note(s) deleted`);
+      } else if (notes_action === 'reassign' && result?.notes_affected) {
+        parts.push(`${result.notes_affected} note(s) reassigned`);
+      }
+      if (result?.private_events_deleted) {
+        parts.push(`${result.private_events_deleted} private event(s) removed`);
+      }
+      toast(parts.join(' · '));
+      await refresh();
+    } catch (err) {
+      toast(err.message, true);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
   function fillMetaControls(selectedLocation = '', selectedPeople = [], selectedGroups = []) {
     const typeSel = document.getElementById('evType');
     const types = (calMeta.types && calMeta.types.length) ? calMeta.types : ['Other'];
@@ -652,16 +703,10 @@
       });
     });
     tbody.querySelectorAll('[data-del-user]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', () => {
         const id = Number(btn.dataset.delUser);
-        if (!confirm('Delete this user? Their bookmarks will also be deleted.')) return;
-        try {
-          await api('/api/users.php', { method: 'DELETE', body: { id } });
-          toast('User deleted');
-          await refresh();
-        } catch (err) {
-          toast(err.message, true);
-        }
+        const u = users.find((x) => Number(x.id) === id);
+        openDeleteUserModal(id, u?.username || `user #${id}`);
       });
     });
 
