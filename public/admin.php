@@ -50,7 +50,7 @@ if ($teamcalLocationsJson === false) {
     <div class="header-actions">
       <button type="button" class="btn btn-sm btn-ghost" id="themeToggle" aria-label="Toggle theme" title="Theme">☀</button>
       <a class="btn btn-sm" href="/">Back to portal</a>
-      <span class="user-chip"><?= e($user['username']) ?></span>
+      <?= render_user_menu($user) ?>
       <form method="post" action="/logout.php" style="display:inline">
         <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
         <button class="btn btn-sm btn-ghost" type="submit">Logout</button>
@@ -482,6 +482,13 @@ if ($teamcalLocationsJson === false) {
           <label>Share groups</label>
           <div class="checkbox-list" id="evGroups"></div>
         </div>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:10px;margin:0;cursor:pointer">
+            <input type="checkbox" id="evNotifyDayBefore">
+            <span>Notify day before</span>
+          </label>
+          <div class="form-hint">People on this event and the owner get a portal notification the day before it starts.</div>
+        </div>
         <div class="form-actions">
           <button type="button" class="btn btn-danger hidden" id="evDelete">Delete</button>
           <div style="flex:1"></div>
@@ -494,6 +501,7 @@ if ($teamcalLocationsJson === false) {
 
   <div class="toast" id="toast"></div>
   <script src="<?= e(asset_url('assets/js/theme.js')) ?>"></script>
+  <script src="<?= e(asset_url('assets/js/user-menu.js')) ?>"></script>
   <script src="<?= e(asset_url('assets/js/admin.js')) ?>"></script>
 </body>
 </html>

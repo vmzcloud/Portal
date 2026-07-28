@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS events (
     visibility TEXT NOT NULL DEFAULT 'public' CHECK(visibility IN ('public', 'share', 'private')),
     owner_id INTEGER,
     ics_uid TEXT,
+    notify_day_before INTEGER NOT NULL DEFAULT 0 CHECK(notify_day_before IN (0, 1)),
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

@@ -54,6 +54,34 @@ function e(?string $value): string
     return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
+/**
+ * Header user menu: notification bell + username dropdown (logged-in only).
+ */
+function render_user_menu(array $user): string
+{
+    $name = e((string) ($user['username'] ?? ''));
+    return <<<HTML
+<div class="user-menu" id="userMenu">
+  <a class="btn btn-sm btn-ghost notif-bell" id="notifBell" href="/notifications.php" title="Notifications" aria-label="Notifications">
+    <span class="notif-bell-icon" aria-hidden="true">🔔</span>
+    <span class="notif-badge hidden" id="notifBadge">0</span>
+  </a>
+  <div class="user-menu-wrap">
+    <button type="button" class="user-chip user-menu-trigger" id="userMenuTrigger" aria-haspopup="true" aria-expanded="false">
+      <span class="user-menu-name">{$name}</span>
+      <span class="user-menu-caret" aria-hidden="true">▾</span>
+    </button>
+    <div class="user-menu-dropdown hidden" id="userMenuDropdown" role="menu">
+      <a class="user-menu-item" role="menuitem" href="/notifications.php">
+        Notifications
+        <span class="notif-badge notif-badge-inline hidden" id="notifMenuBadge">0</span>
+      </a>
+    </div>
+  </div>
+</div>
+HTML;
+}
+
 function base_path(string $path = ''): string
 {
     $root = dirname(__DIR__);

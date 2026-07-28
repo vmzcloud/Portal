@@ -199,6 +199,16 @@ if ($method === 'POST') {
     Todo::syncGroups($id, $data['group_ids']);
     Todo::syncTags($id, $data['tags']);
 
+    if ($data['assignee_id'] !== null) {
+        Notifications::notifyTodoAssigned(
+            $data['assignee_id'],
+            $ownerId,
+            (string) ($user['username'] ?? 'Someone'),
+            $id,
+            $data['title']
+        );
+    }
+
     $task = Todo::loadTask($id);
     $task['can_edit'] = true;
     $task['can_status'] = true;
@@ -323,6 +333,18 @@ if ($method === 'PUT' || $method === 'PATCH') {
     ]);
     Todo::syncGroups($id, $data['group_ids']);
     Todo::syncTags($id, $data['tags']);
+
+    $prevAssignee = $existing['assignee_id'] !== null ? (int) $existing['assignee_id'] : null;
+    $newAssignee = $data['assignee_id'];
+    if ($newAssignee !== null && $newAssignee !== $prevAssignee) {
+        Notifications::notifyTodoAssigned(
+            $newAssignee,
+            (int) $user['id'],
+            (string) ($user['username'] ?? 'Someone'),
+            $id,
+            $data['title']
+        );
+    }
 
     $task = Todo::loadTask($id);
     json_ok(todo_task_flags($task, $user));

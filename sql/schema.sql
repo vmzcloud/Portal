@@ -71,9 +71,26 @@ CREATE TABLE IF NOT EXISTS bookmark_groups (
     FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL DEFAULT '',
+    body TEXT NOT NULL DEFAULT '',
+    link_url TEXT,
+    ref_type TEXT,
+    ref_id INTEGER,
+    actor_id INTEGER,
+    is_read INTEGER NOT NULL DEFAULT 0 CHECK(is_read IN (0, 1)),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE INDEX IF NOT EXISTS idx_tabs_owner ON tabs(owner_id);
 CREATE INDEX IF NOT EXISTS idx_categories_tab ON categories(tab_id);
 CREATE INDEX IF NOT EXISTS idx_categories_owner ON categories(owner_id);
 CREATE INDEX IF NOT EXISTS idx_bookmarks_category ON bookmarks(category_id);
 CREATE INDEX IF NOT EXISTS idx_bookmarks_owner ON bookmarks(owner_id);
 CREATE INDEX IF NOT EXISTS idx_bookmarks_visibility ON bookmarks(visibility);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, is_read);

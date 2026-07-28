@@ -78,6 +78,10 @@ function teamcal_validate_event_payload(array $body, bool $isGuest): array
         $groupIds = [];
     }
 
+    $notifyDayBefore = !empty($body['notify_day_before'])
+        && $body['notify_day_before'] !== '0'
+        && $body['notify_day_before'] !== false;
+
     return [
         'title' => $title,
         'type' => $type,
@@ -91,6 +95,7 @@ function teamcal_validate_event_payload(array $body, bool $isGuest): array
         'visibility' => $visibility,
         'person_ids' => $personIds,
         'group_ids' => $groupIds,
+        'notify_day_before' => $notifyDayBefore ? 1 : 0,
     ];
 }
 
@@ -177,8 +182,9 @@ if ($method === 'POST') {
 
     $stmt = $pdo->prepare(
         'INSERT INTO events
-         (title, type, description, location, color, starts_at, ends_at, all_day, period, visibility, owner_id, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime(\'now\'))'
+         (title, type, description, location, color, starts_at, ends_at, all_day, period, visibility,
+          owner_id, notify_day_before, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime(\'now\'))'
     );
     $stmt->execute([
         $data['title'],
@@ -192,6 +198,7 @@ if ($method === 'POST') {
         $data['period'],
         $data['visibility'],
         $ownerId,
+        $data['notify_day_before'],
     ]);
     $id = (int) $pdo->lastInsertId();
     TeamCal::syncPersons($id, $data['person_ids']);
@@ -221,7 +228,7 @@ if ($method === 'PUT' || $method === 'PATCH') {
         'UPDATE events SET
             title = ?, type = ?, description = ?, location = ?, color = ?,
             starts_at = ?, ends_at = ?, all_day = ?, period = ?, visibility = ?,
-            updated_at = datetime(\'now\')
+            notify_day_before = ?, updated_at = datetime(\'now\')
          WHERE id = ?'
     );
     $stmt->execute([
@@ -235,6 +242,7 @@ if ($method === 'PUT' || $method === 'PATCH') {
         $data['all_day'],
         $data['period'],
         $data['visibility'],
+        $data['notify_day_before'],
         $id,
     ]);
     TeamCal::syncPersons($id, $data['person_ids']);

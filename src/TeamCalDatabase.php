@@ -82,6 +82,7 @@ final class TeamCalDatabase
                 period TEXT NOT NULL DEFAULT \'none\' CHECK(period IN (\'none\', \'am\', \'pm\')),
                 visibility TEXT NOT NULL DEFAULT \'public\' CHECK(visibility IN (\'public\', \'share\', \'private\')),
                 owner_id INTEGER,
+                notify_day_before INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL DEFAULT (datetime(\'now\')),
                 updated_at TEXT NOT NULL DEFAULT (datetime(\'now\'))
             )'
@@ -112,7 +113,15 @@ final class TeamCalDatabase
         if (!in_array('ics_uid', $names, true)) {
             self::$pdo->exec('ALTER TABLE events ADD COLUMN ics_uid TEXT');
         }
+        if (!in_array('notify_day_before', $names, true)) {
+            self::$pdo->exec(
+                'ALTER TABLE events ADD COLUMN notify_day_before INTEGER NOT NULL DEFAULT 0'
+            );
+        }
         self::$pdo->exec('CREATE INDEX IF NOT EXISTS idx_events_ics_uid ON events(ics_uid)');
+        self::$pdo->exec(
+            'CREATE INDEX IF NOT EXISTS idx_events_notify_day ON events(notify_day_before, starts_at)'
+        );
 
         $stmt = self::$pdo->prepare('SELECT value FROM settings WHERE key = ?');
         $stmt->execute(['enabled']);

@@ -50,15 +50,15 @@ $todoEnabled = Todo::isEnabled();
       <?php if ($user): ?>
         <button type="button" class="btn btn-sm" id="btnAddBookmark">+ Bookmark</button>
         <button type="button" class="btn btn-sm" id="btnManage">Manage</button>
-        <?php if ($isAdmin): ?>
-          <a class="btn btn-sm" href="/admin.php">Admin</a>
-        <?php endif; ?>
-        <span class="user-chip"><?= e($user['username']) ?></span>
-        <button type="button" class="btn btn-sm btn-ghost" id="btnChangePassword">Password</button>
-        <form method="post" action="/logout.php" style="display:inline">
-          <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
-          <button class="btn btn-sm btn-ghost" type="submit">Logout</button>
-        </form>
+         <?php if ($isAdmin): ?>
+           <a class="btn btn-sm" href="/admin.php">Admin</a>
+         <?php endif; ?>
+         <?= render_user_menu($user) ?>
+         <button type="button" class="btn btn-sm btn-ghost" id="btnChangePassword">Password</button>
+         <form method="post" action="/logout.php" style="display:inline">
+           <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+           <button class="btn btn-sm btn-ghost" type="submit">Logout</button>
+         </form>
       <?php else: ?>
         <a class="btn btn-sm btn-primary" href="/login.php">Login</a>
       <?php endif; ?>
@@ -219,6 +219,7 @@ $todoEnabled = Todo::isEnabled();
   <div class="category-picker" id="categoryPicker" role="menu" aria-label="Choose category"></div>
   <div class="toast" id="toast"></div>
   <script src="<?= e(asset_url('assets/js/theme.js')) ?>"></script>
+  <script src="<?= e(asset_url('assets/js/user-menu.js')) ?>"></script>
   <script src="<?= e(asset_url('assets/js/app.js')) ?>"></script>
 </body>
 </html>

@@ -110,6 +110,17 @@ if ($method === 'POST') {
     Notes::syncGroups($id, $data['group_ids']);
     Notes::syncTags($id, $data['tags']);
 
+    if ($data['visibility'] === 'share' && $data['group_ids'] !== []) {
+        Notifications::notifyNoteShared(
+            $ownerId,
+            (string) ($user['username'] ?? 'Someone'),
+            $id,
+            $data['title'],
+            $data['group_ids'],
+            []
+        );
+    }
+
     $note = Notes::loadNote($id);
     $note['can_edit'] = true;
     json_ok($note);
@@ -126,6 +137,10 @@ if ($method === 'PUT' || $method === 'PATCH') {
     }
 
     $data = notes_validate_payload($body);
+    $prevGroups = is_array($existing['group_ids'] ?? null) ? $existing['group_ids'] : [];
+    if (($existing['visibility'] ?? '') !== 'share') {
+        $prevGroups = [];
+    }
 
     if (Notes::contentChanged($existing, $data['title'], $data['body_html'])) {
         Notes::snapshotVersion($id, $existing, (int) $user['id']);
@@ -143,6 +158,17 @@ if ($method === 'PUT' || $method === 'PATCH') {
     Notes::syncGroups($id, $data['group_ids']);
     Notes::syncTags($id, $data['tags']);
     Notes::pruneVersions($id);
+
+    if ($data['visibility'] === 'share' && $data['group_ids'] !== []) {
+        Notifications::notifyNoteShared(
+            (int) $user['id'],
+            (string) ($user['username'] ?? 'Someone'),
+            $id,
+            $data['title'],
+            $data['group_ids'],
+            $prevGroups
+        );
+    }
 
     $note = Notes::loadNote($id);
     $note['can_edit'] = true;

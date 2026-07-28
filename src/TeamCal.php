@@ -530,6 +530,7 @@ final class TeamCal
         $row['id'] = $id;
         $row['all_day'] = (int) $row['all_day'];
         $row['owner_id'] = $row['owner_id'] !== null ? (int) $row['owner_id'] : null;
+        $row['notify_day_before'] = !empty($row['notify_day_before']);
         $row['person_ids'] = self::fetchPersonIds($id);
         $row['group_ids'] = self::fetchGroupIds($id);
 

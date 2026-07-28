@@ -52,7 +52,7 @@ $isAdmin = Auth::isAdmin();
       <?php if ($isAdmin): ?>
         <a class="btn btn-sm" href="/admin.php">Admin</a>
       <?php endif; ?>
-      <span class="user-chip"><?= e($user['username']) ?></span>
+      <?= render_user_menu($user) ?>
       <form method="post" action="/logout.php" style="display:inline">
         <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
         <button class="btn btn-sm btn-ghost" type="submit">Logout</button>
@@ -180,6 +180,7 @@ $isAdmin = Auth::isAdmin();
 
   <div class="toast" id="toast"></div>
   <script src="<?= e(asset_url('assets/js/theme.js')) ?>"></script>
+  <script src="<?= e(asset_url('assets/js/user-menu.js')) ?>"></script>
   <script src="<?= e(asset_url('assets/js/todo.js')) ?>"></script>
 </body>
 </html>

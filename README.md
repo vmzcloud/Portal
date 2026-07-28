@@ -311,6 +311,22 @@ Optional task board (`/todo.php`). **Off by default.** **Login users only.**
 - Schema reference: `sql/todo_schema.sql`  
 - Task viewer ids stored in settings key `task_viewers`  
 
+### Notifications
+
+In-app notifications for logged-in users (stored in `portal.db`).
+
+**Triggers**
+
+- **Todo assigned:** when someone assigns a task to you (create or change assignee)  
+- **Note shared:** when a note is shared with a group you belong to (new groups only on edit)  
+- **Event tomorrow:** calendar events with **Notify day before** checked — people on the event + owner, created lazily when the bell/list loads on the day before start  
+
+**UI**
+
+- Header **bell** with unread badge next to the username (all main pages)  
+- Click username → **Notifications** → `/notifications.php`  
+- List page: mark one/all read, dismiss, click row to open Todo/Notes  
+
 ### Authentication
 
 - Session login + CSRF on mutating requests  

@@ -44,6 +44,7 @@ final class Database
             throw new RuntimeException('Unable to read schema.sql');
         }
         self::$pdo->exec($schema);
+        self::ensureNotificationsTable();
     }
 
     private static function migrateExisting(): void
@@ -56,6 +57,33 @@ final class Database
         if (!in_array('must_change_password', $names, true)) {
             self::$pdo->exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0');
         }
+        self::ensureNotificationsTable();
+    }
+
+    private static function ensureNotificationsTable(): void
+    {
+        self::$pdo->exec(
+            'CREATE TABLE IF NOT EXISTS notifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                type TEXT NOT NULL,
+                title TEXT NOT NULL DEFAULT \'\',
+                body TEXT NOT NULL DEFAULT \'\',
+                link_url TEXT,
+                ref_type TEXT,
+                ref_id INTEGER,
+                actor_id INTEGER,
+                is_read INTEGER NOT NULL DEFAULT 0 CHECK(is_read IN (0, 1)),
+                created_at TEXT NOT NULL DEFAULT (datetime(\'now\')),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )'
+        );
+        self::$pdo->exec(
+            'CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC)'
+        );
+        self::$pdo->exec(
+            'CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, is_read)'
+        );
     }
 
     private static function seed(): void

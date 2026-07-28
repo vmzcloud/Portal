@@ -161,6 +161,7 @@ if ($method === 'DELETE') {
     }
     $todoAssigneeCleared = Todo::clearAssignee($id);
     Todo::removeTaskViewer($id);
+    Notifications::deleteAllForUser($id);
 
     $privateEventsDeleted = TeamCal::deletePrivateEventsByOwner($id);
     $personLinksRemoved = TeamCal::removePersonFromAllEvents($id);

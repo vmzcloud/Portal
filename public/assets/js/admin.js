@@ -334,6 +334,13 @@
     else visEl.value = 'public';
     document.getElementById('evGroupsWrap').classList.toggle('hidden', visEl.value !== 'share');
 
+    const notifyEl = document.getElementById('evNotifyDayBefore');
+    if (notifyEl) {
+      notifyEl.checked = !!(defaults.notify_day_before === true
+        || defaults.notify_day_before === 1
+        || defaults.notify_day_before === '1');
+    }
+
     document.getElementById('evDelete').classList.toggle('hidden', !defaults.id);
     document.getElementById('evSubmit').classList.remove('hidden');
     [...document.getElementById('eventForm').elements].forEach((el) => {
@@ -571,6 +578,7 @@
       visibility: document.getElementById('evVisibility').value,
       person_ids: [...document.querySelectorAll('#evPeople input:checked')].map((x) => Number(x.value)),
       group_ids: [...document.querySelectorAll('#evGroups input:checked')].map((x) => Number(x.value)),
+      notify_day_before: !!document.getElementById('evNotifyDayBefore')?.checked,
     };
 
     try {

@@ -275,6 +275,13 @@
     else visEl.value = 'public';
     document.getElementById('evGroupsWrap').classList.toggle('hidden', visEl.value !== 'share');
 
+    const notifyEl = document.getElementById('evNotifyDayBefore');
+    if (notifyEl) {
+      notifyEl.checked = !!(defaults.notify_day_before === true
+        || defaults.notify_day_before === 1
+        || defaults.notify_day_before === '1');
+    }
+
     const canEdit = defaults.can_edit !== false;
     const isEdit = !!defaults.id;
     const lock = isEdit && !canEdit;
@@ -367,6 +374,7 @@
       visibility: document.getElementById('evVisibility').value,
       person_ids,
       group_ids,
+      notify_day_before: !!document.getElementById('evNotifyDayBefore')?.checked,
     };
 
     try {
