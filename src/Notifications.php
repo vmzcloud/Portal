@@ -193,16 +193,27 @@ final class Notifications
         return $out;
     }
 
-    public static function markRead(int $id, int $userId): bool
+    public static function setRead(int $id, int $userId, bool $isRead): bool
     {
         if ($id <= 0 || $userId <= 0) {
             return false;
         }
-        $stmt = self::pdo()->prepare(
-            'UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?'
+        $check = self::pdo()->prepare(
+            'SELECT id FROM notifications WHERE id = ? AND user_id = ?'
         );
-        $stmt->execute([$id, $userId]);
-        return $stmt->rowCount() > 0;
+        $check->execute([$id, $userId]);
+        if (!$check->fetchColumn()) {
+            return false;
+        }
+        self::pdo()->prepare(
+            'UPDATE notifications SET is_read = ? WHERE id = ? AND user_id = ?'
+        )->execute([$isRead ? 1 : 0, $id, $userId]);
+        return true;
+    }
+
+    public static function markRead(int $id, int $userId): bool
+    {
+        return self::setRead($id, $userId, true);
     }
 
     public static function markAllRead(int $userId): int

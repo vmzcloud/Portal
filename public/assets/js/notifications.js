@@ -69,7 +69,9 @@
           </div>
         </div>
         <div class="notif-item-actions">
-          ${n.is_read ? '' : '<button type="button" class="btn btn-sm" data-read>Mark read</button>'}
+          ${n.is_read
+            ? '<button type="button" class="btn btn-sm" data-unread>Mark unread</button>'
+            : '<button type="button" class="btn btn-sm" data-read>Mark read</button>'}
           <button type="button" class="btn btn-sm btn-ghost" data-del title="Dismiss">×</button>
         </div>
       </article>
@@ -77,12 +79,15 @@
 
     list.querySelectorAll('.notif-item').forEach((row) => {
       row.addEventListener('click', async (e) => {
-        if (e.target.closest('[data-read], [data-del]')) return;
+        if (e.target.closest('[data-read], [data-unread], [data-del]')) return;
         const id = Number(row.dataset.id);
         const link = row.dataset.link || '';
         try {
           if (row.classList.contains('is-unread')) {
-            const data = await api('/api/notifications.php', { method: 'PUT', body: { id } });
+            const data = await api('/api/notifications.php', {
+              method: 'PUT',
+              body: { id, is_read: true },
+            });
             if (PN.setBadge) PN.setBadge(data.unread);
           }
         } catch {
@@ -96,7 +101,25 @@
         e.stopPropagation();
         const id = Number(row.dataset.id);
         try {
-          const data = await api('/api/notifications.php', { method: 'PUT', body: { id } });
+          const data = await api('/api/notifications.php', {
+            method: 'PUT',
+            body: { id, is_read: true },
+          });
+          if (PN.setBadge) PN.setBadge(data.unread);
+          await load();
+        } catch (err) {
+          toast(err.message, true);
+        }
+      });
+
+      row.querySelector('[data-unread]')?.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = Number(row.dataset.id);
+        try {
+          const data = await api('/api/notifications.php', {
+            method: 'PUT',
+            body: { id, is_read: false },
+          });
           if (PN.setBadge) PN.setBadge(data.unread);
           await load();
         } catch (err) {

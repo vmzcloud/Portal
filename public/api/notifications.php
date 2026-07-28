@@ -45,12 +45,16 @@ if ($method === 'PUT' || $method === 'PATCH' || $method === 'POST') {
     if ($id <= 0) {
         json_error('Provide id or all');
     }
-    if (!Notifications::markRead($id, $uid)) {
+    $isRead = true;
+    if (array_key_exists('is_read', $body)) {
+        $isRead = !empty($body['is_read']) && $body['is_read'] !== '0' && $body['is_read'] !== false;
+    }
+    if (!Notifications::setRead($id, $uid, $isRead)) {
         json_error('Notification not found', 404);
     }
     json_ok([
         'id' => $id,
-        'is_read' => true,
+        'is_read' => $isRead,
         'unread' => Notifications::unreadCount($uid),
     ]);
 }
