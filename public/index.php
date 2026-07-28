@@ -15,6 +15,8 @@ TeamCalDatabase::connection();
 $teamcalEnabled = TeamCal::isEnabled();
 NotesDatabase::connection();
 $notesEnabled = Notes::isEnabled();
+TodoDatabase::connection();
+$todoEnabled = Todo::isEnabled();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -41,6 +43,9 @@ $notesEnabled = Notes::isEnabled();
       <?php endif; ?>
       <?php if ($notesEnabled && $user): ?>
         <a class="btn btn-sm" href="/notes.php">Notes</a>
+      <?php endif; ?>
+      <?php if ($todoEnabled && $user): ?>
+        <a class="btn btn-sm" href="/todo.php">Todo</a>
       <?php endif; ?>
       <?php if ($user): ?>
         <button type="button" class="btn btn-sm" id="btnAddBookmark">+ Bookmark</button>

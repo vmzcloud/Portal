@@ -133,8 +133,14 @@ if ($method === 'DELETE') {
         json_error('Invalid notes_action (use delete, reassign, or keep)');
     }
 
+    $todoAction = strtolower(trim((string) ($body['todo_action'] ?? 'keep')));
+    if (!in_array($todoAction, ['delete', 'reassign', 'keep'], true)) {
+        json_error('Invalid todo_action (use delete, reassign, or keep)');
+    }
+
     NotesDatabase::connection();
     TeamCalDatabase::connection();
+    TodoDatabase::connection();
 
     $notesAffected = 0;
     if ($notesAction === 'delete') {
@@ -144,6 +150,16 @@ if ($method === 'DELETE') {
     } else {
         $notesAffected = Notes::countByOwner($id);
     }
+
+    $todoAffected = 0;
+    if ($todoAction === 'delete') {
+        $todoAffected = Todo::deleteByOwner($id);
+    } elseif ($todoAction === 'reassign') {
+        $todoAffected = Todo::reassignOwner($id, (int) $admin['id']);
+    } else {
+        $todoAffected = Todo::countByOwner($id);
+    }
+    $todoAssigneeCleared = Todo::clearAssignee($id);
 
     $privateEventsDeleted = TeamCal::deletePrivateEventsByOwner($id);
     $personLinksRemoved = TeamCal::removePersonFromAllEvents($id);
@@ -168,6 +184,9 @@ if ($method === 'DELETE') {
         'id' => $id,
         'notes_action' => $notesAction,
         'notes_affected' => $notesAffected,
+        'todo_action' => $todoAction,
+        'todo_affected' => $todoAffected,
+        'todo_assignee_cleared' => $todoAssigneeCleared,
         'private_events_deleted' => $privateEventsDeleted,
         'person_links_removed' => $personLinksRemoved,
     ]);

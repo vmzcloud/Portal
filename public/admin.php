@@ -18,6 +18,8 @@ TeamCalDatabase::connection();
 $teamcalEnabled = TeamCal::isEnabled();
 NotesDatabase::connection();
 $notesEnabled = Notes::isEnabled();
+TodoDatabase::connection();
+$todoEnabled = Todo::isEnabled();
 $teamcalTypesJson = json_encode(
     TeamCal::eventTypes(),
     JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
@@ -63,6 +65,7 @@ if ($teamcalLocationsJson === false) {
       <button class="btn btn-sm" data-panel="events">Events</button>
       <button class="btn btn-sm" data-panel="teamcal">Team Calendar</button>
       <button class="btn btn-sm" data-panel="notes">Notes</button>
+      <button class="btn btn-sm" data-panel="todo">Todo</button>
     </div>
 
     <section class="admin-panel" id="panel-users">
@@ -342,6 +345,19 @@ if ($teamcalLocationsJson === false) {
         <button type="button" class="btn btn-primary" id="notesSaveEnabled">Save setting</button>
       </div>
     </section>
+
+    <section class="admin-panel hidden" id="panel-todo">
+      <h2>Todo</h2>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:10px;margin:0">
+          <input type="checkbox" id="todoEnabled"<?= $todoEnabled ? ' checked' : '' ?>> Enable Todo
+        </label>
+        <div class="form-hint">When disabled, the Todo link and kanban board are hidden. Default is off. Assign tasks, track To do / In progress / Done.</div>
+      </div>
+      <div class="form-actions" style="justify-content:flex-start;margin-bottom:8px">
+        <button type="button" class="btn btn-primary" id="todoSaveEnabled">Save setting</button>
+      </div>
+    </section>
   </div>
 
   <div class="modal-backdrop" id="deleteUserModal" role="dialog" aria-modal="true" aria-labelledby="deleteUserModalTitle">
@@ -365,8 +381,25 @@ if ($teamcalLocationsJson === false) {
           </label>
         </div>
       </div>
+      <div class="form-group" style="margin-top:14px">
+        <label>What should happen to their todo tasks?</label>
+        <div class="radio-list" style="display:flex;flex-direction:column;gap:8px;margin-top:6px">
+          <label style="display:flex;gap:8px;align-items:flex-start;margin:0;cursor:pointer">
+            <input type="radio" name="deleteUserTodoAction" value="delete" style="margin-top:3px">
+            <span><strong>Delete all tasks</strong><br><span style="color:var(--text-muted);font-size:0.85rem">Remove every task owned by this user</span></span>
+          </label>
+          <label style="display:flex;gap:8px;align-items:flex-start;margin:0;cursor:pointer">
+            <input type="radio" name="deleteUserTodoAction" value="reassign" style="margin-top:3px">
+            <span><strong>Reassign tasks to me</strong><br><span style="color:var(--text-muted);font-size:0.85rem">Transfer ownership to your admin account</span></span>
+          </label>
+          <label style="display:flex;gap:8px;align-items:flex-start;margin:0;cursor:pointer">
+            <input type="radio" name="deleteUserTodoAction" value="keep" checked style="margin-top:3px">
+            <span><strong>Keep tasks</strong><br><span style="color:var(--text-muted);font-size:0.85rem">Leave tasks; owner shown as “Deleted user”</span></span>
+          </label>
+        </div>
+      </div>
       <p style="margin:12px 0 0;color:var(--text-muted);font-size:0.85rem;line-height:1.4">
-        Bookmarks are always deleted. Private calendar events owned by this user are always deleted.
+        Bookmarks are always deleted. Private calendar events owned by this user are always deleted. Assignee links on todos are cleared.
         Public/shared events are kept. They are removed from event people lists.
       </p>
       <div class="form-actions" style="margin-top:18px">

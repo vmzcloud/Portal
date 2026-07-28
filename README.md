@@ -5,7 +5,7 @@ Dark-themed personal portal built with **PHP + SQLite**.
 - **UI language:** English  
 - **Content:** any UTF-8 text (including Chinese titles / labels)  
 - **Stack:** plain PHP (no Composer / Node build), SQLite file DBs  
-- **Apps:** bookmark start page + optional **Team Calendar** + optional **Notes**
+- **Apps:** bookmark start page + optional **Team Calendar** + optional **Notes** + optional **Todo**
 
 ## Requirements
 
@@ -82,7 +82,8 @@ Open: **http://localhost:8080**
 
 First start creates `data/portal.db` and seed data (tabs, categories, sample bookmarks).  
 Team Calendar uses a separate DB (`data/teamcal.db`), created on first access, **disabled by default**.  
-Notes uses a separate DB (`data/notes.db`), created on first access, **disabled by default**.
+Notes uses a separate DB (`data/notes.db`), created on first access, **disabled by default**.  
+Todo uses a separate DB (`data/todo.db`), created on first access, **disabled by default**.
 
 **Change default passwords before any real deployment.**
 
@@ -90,7 +91,7 @@ Notes uses a separate DB (`data/notes.db`), created on first access, **disabled 
 
 ```bash
 docker compose down
-rm -f data/portal.db data/teamcal.db data/notes.db
+rm -f data/portal.db data/teamcal.db data/notes.db data/todo.db
 # optional: reset type/location lists
 # rm -rf data/teamcal
 docker compose up -d --build
@@ -98,7 +99,8 @@ docker compose up -d --build
 
 Existing portal DBs pick up schema updates automatically (e.g. `is_active`, `must_change_password`).  
 Team Calendar tables are ensured on connect via `TeamCalDatabase`.  
-Notes tables are ensured on connect via `NotesDatabase`.
+Notes tables are ensured on connect via `NotesDatabase`.  
+Todo tables are ensured on connect via `TodoDatabase`.
 
 ## Features
 
@@ -251,6 +253,47 @@ Optional personal/shared notes (`/notes.php`). **Off by default.** **Login users
 - Schema reference: `sql/notes_schema.sql` (includes `tags`, `note_tags`, `note_versions`)  
 - HTML body is sanitized server-side (allowlisted tags; safe `color` on text only)  
 
+### Todo
+
+Optional task board (`/todo.php`). **Off by default.** **Login users only.**
+
+**Enable**
+
+1. Log in as admin → **Admin** → **Todo**  
+2. Check **Enable Todo** → **Save setting**  
+3. Logged-in users see **Todo** in the header, or open `/todo.php`
+
+**UI**
+
+- Kanban board: **To do** | **In progress** | **Done**  
+- Drag cards between columns to change status (owner, assignee, or admin)  
+- Click a card to edit; **+ Task** to create  
+- Search + filter: all visible / created by me / assigned to me  
+- **Archive:** done tasks can be archived (card button, modal, or **Archive done** bulk); **Archive** view lists them; **Unarchive** restores to Done  
+
+**Task fields**
+
+- Title, description  
+- Status: `todo` / `in_progress` / `done`  
+- Optional **due date** (overdue highlighted)  
+- Optional single **assignee**  
+- Visibility: **private** (owner + assignee + admin) or **share** (selected groups + owner + assignee + admin)  
+- **Archived** flag (separate from status; only done tasks)  
+
+**Permissions**
+
+| Action | Who |
+|--------|-----|
+| View | Owner, assignee, shared group members, admin |
+| Edit fields / delete | Owner, admin |
+| Change status | Owner, assignee, admin |
+| Archive / unarchive | Owner, assignee, admin |
+
+**Storage**
+
+- `data/todo.db` (separate SQLite DB)  
+- Schema reference: `sql/todo_schema.sql`  
+
 ### Authentication
 
 - Session login + CSRF on mutating requests  
@@ -271,11 +314,13 @@ Optional personal/shared notes (`/notes.php`). **Off by default.** **Login users
     |---------|----------|
     | Bookmarks | Always deleted |
     | **Notes** | Choose: **Delete all** / **Reassign to me** / **Keep** |
+    | **Todo** tasks owned by the user | Choose: **Delete all** / **Reassign to me** / **Keep** |
+    | Todo assignee links | Always cleared |
     | **Private** calendar events owned by the user | Always deleted |
     | Public / share events owned by the user | Kept (owner shown as **Deleted user**) |
     | Event people lists | User removed from all events |
-  - Kept orphan notes/events show owner as **Deleted user**; admin can still edit/delete them  
-- **Groups:** create/edit/delete groups, assign members (for **share** bookmarks / events / notes)  
+  - Kept orphan notes/events/tasks show owner as **Deleted user**; admin can still edit/delete them  
+- **Groups:** create/edit/delete groups, assign members (for **share** bookmarks / events / notes / todos)  
 - **Events** (Team Calendar list management — admin only):  
   - Table of events with **Edit** / **Delete** and **+ Event** (same modal form as the week view)  
   - **Search** across title, description, location  
@@ -285,6 +330,7 @@ Optional personal/shared notes (`/notes.php`). **Off by default.** **Login users
   - Admins can list/manage events even when Team Calendar is disabled  
 - **Team Calendar** settings: enable toggle, period ranges, types/locations JSON editors, holiday ICS  
 - **Notes**: enable / disable toggle only  
+- **Todo**: enable / disable toggle only  
 
 ### UI chrome
 
@@ -315,6 +361,10 @@ Optional personal/shared notes (`/notes.php`). **Off by default.** **Login users
 | CRUD own notes / view share notes | — | ✓ | ✓ |
 | Edit/delete any note | — | — | ✓ |
 | Enable Notes | — | — | ✓ |
+| Open Todo (when enabled) | — | ✓ | ✓ |
+| Create tasks / edit own / status if assignee | — | ✓ | ✓ |
+| Edit/delete any task | — | — | ✓ |
+| Enable Todo | — | — | ✓ |
 
 ## Data & files
 
@@ -323,6 +373,7 @@ Optional personal/shared notes (`/notes.php`). **Off by default.** **Login users
 | `data/portal.db` | Users, groups, tabs, categories, bookmarks |
 | `data/teamcal.db` | Team Calendar settings + events |
 | `data/notes.db` | Notes settings, notes, tags, versions |
+| `data/todo.db` | Todo settings + tasks |
 | `data/teamcal/event_types.json` | Event type dropdown list |
 | `data/teamcal/locations.json` | Location dropdown list |
 | `data/teamcal/holidays.json` | Holiday dates (from holiday ICS) |
@@ -330,6 +381,7 @@ Optional personal/shared notes (`/notes.php`). **Off by default.** **Login users
 | `sql/schema.sql` | Portal schema (new installs) |
 | `sql/teamcal_schema.sql` | Team Calendar schema reference |
 | `sql/notes_schema.sql` | Notes schema reference |
+| `sql/todo_schema.sql` | Todo schema reference |
 
 Compose mounts `./data` (and `./public`, `./src`) so databases and uploads survive container rebuilds.
 
@@ -352,17 +404,22 @@ Portal/
 │   │   │   ├── versions.php
 │   │   │   ├── meta.php
 │   │   │   └── settings.php
+│   │   ├── todo/
+│   │   │   ├── tasks.php
+│   │   │   ├── meta.php
+│   │   │   └── settings.php
 │   │   └── teamcal/
 │   │       ├── events.php
 │   │       ├── holidays.php
 │   │       ├── import.php
 │   │       ├── meta.php
 │   │       └── settings.php
-│   ├── assets/css|js/      # style.css, theme.js, app.js, admin.js, calendar.js, notes.js
+│   ├── assets/css|js/      # style.css, theme.js, app.js, admin.js, calendar.js, notes.js, todo.js
 │   ├── uploads/icons/
 │   ├── index.php           # main bookmark portal
 │   ├── calendar.php        # Team Calendar week view
 │   ├── notes.php           # Notes (login, when enabled)
+│   ├── todo.php            # Todo kanban (login, when enabled)
 │   ├── login.php
 │   ├── logout.php
 │   ├── change-password.php
@@ -375,13 +432,16 @@ Portal/
 │   ├── TeamCalDatabase.php # teamcal.db
 │   ├── Notes.php
 │   ├── NotesDatabase.php   # notes.db
+│   ├── Todo.php
+│   ├── TodoDatabase.php    # todo.db
 │   ├── IcsParser.php       # .ics import / holidays
 │   ├── helpers.php
 │   └── bootstrap.php
 ├── sql/
 │   ├── schema.sql
 │   ├── teamcal_schema.sql
-│   └── notes_schema.sql
+│   ├── notes_schema.sql
+│   └── todo_schema.sql
 ├── data/                   # runtime DBs + teamcal JSON (not in docroot)
 ├── Dockerfile
 ├── docker-compose.yml

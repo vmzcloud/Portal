@@ -45,9 +45,11 @@
       document.getElementById('panel-events')?.classList.toggle('hidden', panel !== 'events');
       document.getElementById('panel-teamcal').classList.toggle('hidden', panel !== 'teamcal');
       document.getElementById('panel-notes')?.classList.toggle('hidden', panel !== 'notes');
+      document.getElementById('panel-todo')?.classList.toggle('hidden', panel !== 'todo');
       if (panel === 'teamcal') loadTeamCal().catch((err) => toast(err.message, true));
       if (panel === 'events') loadAdminEventsPanel().catch((err) => toast(err.message, true));
       if (panel === 'notes') loadNotesSettings().catch((err) => toast(err.message, true));
+      if (panel === 'todo') loadTodoSettings().catch((err) => toast(err.message, true));
     });
   });
 
@@ -137,9 +139,11 @@
   function openDeleteUserModal(id, username) {
     pendingDeleteUserId = id;
     const body = document.getElementById('deleteUserModalBody');
-    body.innerHTML = `Delete <strong>${esc(username)}</strong>? Bookmarks will be removed. Choose what to do with their notes.`;
+    body.innerHTML = `Delete <strong>${esc(username)}</strong>? Bookmarks will be removed. Choose what to do with their notes and todos.`;
     const keep = document.querySelector('input[name="deleteUserNotesAction"][value="keep"]');
     if (keep) keep.checked = true;
+    const todoKeep = document.querySelector('input[name="deleteUserTodoAction"][value="keep"]');
+    if (todoKeep) todoKeep.checked = true;
     document.getElementById('deleteUserModal').classList.add('open');
   }
 
@@ -157,12 +161,14 @@
     if (!id) return;
     const selected = document.querySelector('input[name="deleteUserNotesAction"]:checked');
     const notes_action = selected?.value || 'keep';
+    const todoSelected = document.querySelector('input[name="deleteUserTodoAction"]:checked');
+    const todo_action = todoSelected?.value || 'keep';
     const btn = document.getElementById('deleteUserConfirm');
     btn.disabled = true;
     try {
       const result = await api('/api/users.php', {
         method: 'DELETE',
-        body: { id, notes_action },
+        body: { id, notes_action, todo_action },
       });
       closeDeleteUserModal();
       const parts = ['User deleted'];
@@ -170,6 +176,14 @@
         parts.push(`${result.notes_affected} note(s) deleted`);
       } else if (notes_action === 'reassign' && result?.notes_affected) {
         parts.push(`${result.notes_affected} note(s) reassigned`);
+      }
+      if (todo_action === 'delete' && result?.todo_affected) {
+        parts.push(`${result.todo_affected} task(s) deleted`);
+      } else if (todo_action === 'reassign' && result?.todo_affected) {
+        parts.push(`${result.todo_affected} task(s) reassigned`);
+      }
+      if (result?.todo_assignee_cleared) {
+        parts.push(`${result.todo_assignee_cleared} assignee link(s) cleared`);
       }
       if (result?.private_events_deleted) {
         parts.push(`${result.private_events_deleted} private event(s) removed`);
@@ -995,6 +1009,22 @@
       const enabled = document.getElementById('notesEnabled').checked;
       await api('/api/notes/settings.php', { method: 'PUT', body: { enabled } });
       toast(enabled ? 'Notes enabled' : 'Notes disabled');
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+
+  async function loadTodoSettings() {
+    const data = await api('/api/todo/settings.php');
+    const el = document.getElementById('todoEnabled');
+    if (el) el.checked = !!data.enabled;
+  }
+
+  document.getElementById('todoSaveEnabled')?.addEventListener('click', async () => {
+    try {
+      const enabled = document.getElementById('todoEnabled').checked;
+      await api('/api/todo/settings.php', { method: 'PUT', body: { enabled } });
+      toast(enabled ? 'Todo enabled' : 'Todo disabled');
     } catch (err) {
       toast(err.message, true);
     }
