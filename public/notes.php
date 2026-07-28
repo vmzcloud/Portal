@@ -62,7 +62,8 @@ $isAdmin = Auth::isAdmin();
   <main class="notes-main" id="notesMain" data-view="list">
     <aside class="notes-sidebar" id="notesSidebar">
       <div class="notes-sidebar-head">
-        <input class="form-control" id="notesSearch" type="search" placeholder="Search notes or #tags…">
+        <input class="form-control" id="notesSearch" type="search" placeholder='Search…  #tag AND word  ·  a OR b' title="AND / OR / #tag / &quot;phrase&quot; / parentheses">
+        <div class="notes-tag-cloud" id="notesTagCloud" aria-label="Tag cloud"></div>
       </div>
       <div class="notes-list" id="notesList"></div>
     </aside>
@@ -132,7 +133,8 @@ $isAdmin = Auth::isAdmin();
 
     <section class="notes-cards-wrap hidden" id="notesCardsWrap">
       <div class="notes-cards-head">
-        <input class="form-control" id="notesCardsSearch" type="search" placeholder="Search notes or #tags…">
+        <input class="form-control" id="notesCardsSearch" type="search" placeholder='Search…  #tag AND word  ·  a OR b' title="AND / OR / #tag / &quot;phrase&quot; / parentheses">
+        <div class="notes-tag-cloud" id="notesCardsTagCloud" aria-label="Tag cloud"></div>
       </div>
       <div class="notes-cards" id="notesCards"></div>
     </section>

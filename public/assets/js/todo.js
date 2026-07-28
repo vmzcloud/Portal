@@ -9,6 +9,10 @@
   let groups = [];
   let dragId = null;
   let viewMode = 'board';
+  let canViewAll = false;
+  let viewAs = 'me';
+  let editorTags = [];
+  let tagsLocked = false;
 
   function toast(msg, isError = false) {
     toastEl.textContent = msg;
@@ -110,7 +114,7 @@
   }
 
   function setFormLocked(lock, statusOnly) {
-    const fields = ['taskTitle', 'taskDescription', 'taskDue', 'taskAssignee', 'taskVisibility'];
+    const fields = ['taskTitle', 'taskDescription', 'taskDue', 'taskAssignee', 'taskVisibility', 'taskTagInput'];
     fields.forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.disabled = !!lock;
@@ -118,6 +122,9 @@
     document.querySelectorAll('#taskGroups input').forEach((el) => {
       el.disabled = !!lock;
     });
+    tagsLocked = !!lock;
+    document.getElementById('taskTags')?.classList.toggle('is-locked', !!lock);
+    renderEditorTags();
     document.getElementById('taskStatus').disabled = !!lock && !statusOnly;
     document.getElementById('taskSave').classList.toggle('hidden', lock && !statusOnly);
     document.getElementById('taskSave').disabled = lock && !statusOnly;
@@ -126,6 +133,75 @@
       document.getElementById('taskSave').disabled = false;
       document.getElementById('taskStatus').disabled = false;
     }
+  }
+
+  function normalizeTag(raw) {
+    let name = String(raw ?? '').trim().toLowerCase();
+    if (name.startsWith('#')) name = name.replace(/^#+/, '');
+    name = name.trim();
+    if (!name || name.length > 40) return null;
+    if (!/^[a-z0-9][a-z0-9_-]*$/.test(name)) return null;
+    return name;
+  }
+
+  function renderEditorTags() {
+    const box = document.getElementById('taskTagsChips');
+    if (!box) return;
+    box.innerHTML = editorTags.map((t) => `
+      <span class="todo-tag-chip" data-tag="${esc(t)}">
+        #${esc(t)}
+        ${tagsLocked ? '' : `<button type="button" class="todo-tag-remove" data-tag="${esc(t)}" aria-label="Remove #${esc(t)}">×</button>`}
+      </span>
+    `).join('');
+    box.querySelectorAll('.todo-tag-remove').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (tagsLocked) return;
+        editorTags = editorTags.filter((t) => t !== btn.dataset.tag);
+        renderEditorTags();
+      });
+    });
+  }
+
+  function setEditorTags(tags = []) {
+    const seen = new Set();
+    editorTags = [];
+    for (const raw of tags) {
+      const name = normalizeTag(raw);
+      if (!name || seen.has(name)) continue;
+      seen.add(name);
+      editorTags.push(name);
+      if (editorTags.length >= 20) break;
+    }
+    renderEditorTags();
+  }
+
+  function addEditorTag(raw) {
+    const name = normalizeTag(raw);
+    if (!name || tagsLocked) return false;
+    if (editorTags.includes(name)) return false;
+    if (editorTags.length >= 20) {
+      toast('Maximum 20 hashtags', true);
+      return false;
+    }
+    editorTags.push(name);
+    renderEditorTags();
+    return true;
+  }
+
+  function tagsHtml(tags = []) {
+    if (!tags.length) return '';
+    return `<div class="todo-tags-inline">${tags.map((t) =>
+      `<span class="todo-tag-chip todo-tag-filter" data-tag="${esc(t)}">#${esc(t)}</span>`
+    ).join('')}</div>`;
+  }
+
+  function filterByTag(tag) {
+    const name = normalizeTag(tag);
+    if (!name) return;
+    document.getElementById('todoSearch').value = `#${name}`;
+    loadTasks().catch((err) => toast(err.message, true));
   }
 
   function toggleGroupsVisibility() {
@@ -166,6 +242,8 @@
     document.getElementById('taskVisibility').value = 'private';
     fillGroups([]);
     toggleGroupsVisibility();
+    setEditorTags([]);
+    document.getElementById('taskTagInput').value = '';
     document.getElementById('taskMetaInfo').textContent = '';
     document.getElementById('taskDelete').classList.add('hidden');
     document.getElementById('taskArchive').classList.add('hidden');
@@ -189,6 +267,8 @@
     document.getElementById('taskVisibility').value = task.visibility || 'private';
     fillGroups(task.group_ids || []);
     toggleGroupsVisibility();
+    setEditorTags(task.tags || []);
+    document.getElementById('taskTagInput').value = '';
 
     const bits = [];
     if (task.owner_name) bits.push(`Owner: ${task.owner_name}`);
@@ -239,10 +319,12 @@
     const unarchiveBtn = archiveView && t.can_archive
       ? `<button type="button" class="btn btn-sm todo-card-unarchive" data-unarchive-id="${t.id}" title="Unarchive">Unarchive</button>`
       : '';
+    const tags = Array.isArray(t.tags) ? t.tags : [];
     return `
       <article class="todo-card${overdue ? ' is-overdue' : ''}${archiveView ? ' is-archived' : ''}" draggable="${drag}" data-id="${t.id}" data-status="${esc(t.status)}">
         <div class="todo-card-title">${esc(t.title || 'Untitled')}</div>
         ${t.description ? `<div class="todo-card-desc">${esc(t.description).slice(0, 120)}</div>` : ''}
+        ${tagsHtml(tags)}
         <div class="todo-card-meta">
           ${assignee}
           ${mine}
@@ -309,10 +391,18 @@
   function bindCards() {
     document.querySelectorAll('.todo-card').forEach((card) => {
       card.addEventListener('click', (e) => {
-        if (e.target.closest('[data-archive-id], [data-unarchive-id]')) return;
+        if (e.target.closest('[data-archive-id], [data-unarchive-id], .todo-tag-filter')) return;
         const id = Number(card.dataset.id);
         const t = tasks.find((x) => x.id === id);
         if (t) openEdit(t);
+      });
+
+      card.querySelectorAll('.todo-tag-filter').forEach((el) => {
+        el.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          filterByTag(el.dataset.tag);
+        });
       });
 
       const archBtn = card.querySelector('[data-archive-id]');
@@ -392,10 +482,55 @@
     });
   }
 
+  function fillViewAsSelect() {
+    const sel = document.getElementById('todoViewAs');
+    const wrap = document.getElementById('todoViewAsWrap');
+    if (!sel || !wrap) return;
+    wrap.classList.toggle('hidden', !canViewAll);
+    if (!canViewAll) {
+      viewAs = 'me';
+      return;
+    }
+    const cur = viewAs;
+    sel.innerHTML = [
+      '<option value="me">Me</option>',
+      '<option value="all">All users</option>',
+      ...users
+        .filter((u) => Number(u.id) !== myId)
+        .map((u) => `<option value="${u.id}">${esc(u.username)}</option>`),
+    ].join('');
+    if ([...sel.options].some((o) => o.value === String(cur))) {
+      sel.value = String(cur);
+    } else {
+      sel.value = 'me';
+      viewAs = 'me';
+    }
+  }
+
+  function updateViewBanner() {
+    const banner = document.getElementById('todoViewBanner');
+    if (!banner) return;
+    if (!canViewAll || viewAs === 'me') {
+      banner.classList.add('hidden');
+      banner.textContent = '';
+      return;
+    }
+    let label = 'All users';
+    if (viewAs !== 'all') {
+      const u = users.find((x) => String(x.id) === String(viewAs));
+      label = u ? u.username : `User #${viewAs}`;
+    }
+    banner.textContent = `Viewing as ${label} — read-only except your own tasks`;
+    banner.classList.remove('hidden');
+  }
+
   async function loadMeta() {
     const meta = await api('/api/todo/meta.php');
     users = Array.isArray(meta.users) ? meta.users : [];
     groups = Array.isArray(meta.groups) ? meta.groups : [];
+    canViewAll = !!meta.can_view_all;
+    fillViewAsSelect();
+    updateViewBanner();
   }
 
   async function loadTasks() {
@@ -405,9 +540,13 @@
     if (q) params.set('q', q);
     if (filter) params.set('filter', filter);
     if (viewMode === 'archive') params.set('archived', '1');
+    if (canViewAll && viewAs && viewAs !== 'me') {
+      params.set('view_user_id', viewAs === 'all' ? 'all' : String(viewAs));
+    }
     const qs = params.toString() ? `?${params}` : '';
     tasks = await api(`/api/todo/tasks.php${qs}`);
     if (!Array.isArray(tasks)) tasks = [];
+    updateViewBanner();
     render();
   }
 
@@ -420,6 +559,11 @@
 
   document.getElementById('todoViewBoard').addEventListener('click', () => setView('board'));
   document.getElementById('todoViewArchive').addEventListener('click', () => setView('archive'));
+
+  document.getElementById('todoViewAs')?.addEventListener('change', () => {
+    viewAs = document.getElementById('todoViewAs').value || 'me';
+    loadTasks().catch((err) => toast(err.message, true));
+  });
 
   document.getElementById('btnArchiveAllDone').addEventListener('click', async () => {
     const list = tasks.filter((t) => t.status === 'done' && t.can_archive && !t.archived);
@@ -476,11 +620,37 @@
     loadTasks().catch((err) => toast(err.message, true));
   });
 
+  const tagInput = document.getElementById('taskTagInput');
+  tagInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      const raw = tagInput.value;
+      tagInput.value = '';
+      if (raw.trim()) addEditorTag(raw);
+    } else if (e.key === 'Backspace' && !tagInput.value && editorTags.length && !tagsLocked) {
+      editorTags.pop();
+      renderEditorTags();
+    }
+  });
+  tagInput?.addEventListener('blur', () => {
+    const raw = tagInput.value;
+    if (raw.trim()) {
+      addEditorTag(raw);
+      tagInput.value = '';
+    }
+  });
+
   document.getElementById('taskForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const id = Number(document.getElementById('taskId').value || 0);
     const existing = id ? tasks.find((t) => t.id === id) : null;
     if (existing?.archived) return;
+
+    // flush pending tag input
+    if (tagInput?.value.trim()) {
+      addEditorTag(tagInput.value);
+      tagInput.value = '';
+    }
 
     try {
       let saved;
@@ -500,6 +670,7 @@
           assignee_id: assigneeVal ? Number(assigneeVal) : null,
           visibility: document.getElementById('taskVisibility').value,
           group_ids,
+          tags: [...editorTags],
         };
         if (id) {
           payload.id = id;

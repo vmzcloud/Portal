@@ -1018,6 +1018,24 @@
     const data = await api('/api/todo/settings.php');
     const el = document.getElementById('todoEnabled');
     if (el) el.checked = !!data.enabled;
+
+    const box = document.getElementById('todoTaskViewers');
+    if (!box) return;
+    if (!users.length) {
+      await loadUsers();
+    }
+    const selected = new Set((data.task_viewer_ids || []).map(Number));
+    const active = users.filter((u) => Number(u.is_active) === 1);
+    if (!active.length) {
+      box.innerHTML = '<div class="form-hint">No active users</div>';
+      return;
+    }
+    box.innerHTML = active.map((u) => `
+      <label class="checkbox-item" style="display:flex;gap:8px;align-items:center;margin:0 0 6px;cursor:pointer">
+        <input type="checkbox" value="${u.id}"${selected.has(Number(u.id)) ? ' checked' : ''}>
+        <span>${esc(u.username)}${u.role === 'admin' ? ' <span class="badge admin">admin</span>' : ''}</span>
+      </label>
+    `).join('');
   }
 
   document.getElementById('todoSaveEnabled')?.addEventListener('click', async () => {
@@ -1025,6 +1043,18 @@
       const enabled = document.getElementById('todoEnabled').checked;
       await api('/api/todo/settings.php', { method: 'PUT', body: { enabled } });
       toast(enabled ? 'Todo enabled' : 'Todo disabled');
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+
+  document.getElementById('todoSaveViewers')?.addEventListener('click', async () => {
+    try {
+      const task_viewer_ids = [...document.querySelectorAll('#todoTaskViewers input:checked')]
+        .map((el) => Number(el.value))
+        .filter((id) => id > 0);
+      await api('/api/todo/settings.php', { method: 'PUT', body: { task_viewer_ids } });
+      toast(`Task viewers saved (${task_viewer_ids.length})`);
     } catch (err) {
       toast(err.message, true);
     }

@@ -27,12 +27,14 @@ if ($method === 'GET') {
         $groups = $stmt->fetchAll();
     }
 
+    $userGroupIds = Auth::userGroupIds((int) $user['id']);
     json_ok([
         'enabled' => Notes::isEnabled(),
         'groups' => array_map(static fn ($g) => [
             'id' => (int) $g['id'],
             'name' => (string) $g['name'],
         ], $groups),
+        'tags' => Notes::tagCloud($user, $userGroupIds),
     ]);
 }
 

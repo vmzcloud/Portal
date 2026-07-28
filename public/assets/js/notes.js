@@ -5,6 +5,7 @@
 
   let notes = [];
   let groups = [];
+  let tagCloud = [];
   let selectedId = null;
   let viewMode = 'list';
   let editorTags = [];
@@ -188,6 +189,7 @@
     if (!name) return;
     setSearchQuery(`#${name}`);
     loadNotes(`#${name}`).catch((err) => toast(err.message, true));
+    renderTagClouds();
   }
 
   function bindTagFilters(root) {
@@ -198,6 +200,45 @@
         filterByTag(el.dataset.tag);
       });
     });
+  }
+
+  function activeSearchTag() {
+    const q = getSearchQuery().trim();
+    const m = q.match(/^#([a-z0-9][a-z0-9_-]*)$/i);
+    return m ? m[1].toLowerCase() : '';
+  }
+
+  function renderTagClouds() {
+    const active = activeSearchTag();
+    const max = tagCloud.reduce((m, t) => Math.max(m, t.count || 0), 1) || 1;
+    const min = tagCloud.reduce((m, t) => Math.min(m, t.count || 0), max) || 1;
+    const html = !tagCloud.length
+      ? ''
+      : tagCloud.map((t) => {
+        const name = String(t.name || '');
+        const count = Number(t.count) || 0;
+        const ratio = max === min ? 0.5 : (count - min) / (max - min);
+        const size = (0.75 + ratio * 0.4).toFixed(2);
+        const isActive = active && active === name.toLowerCase();
+        return `<button type="button" class="notes-tag-chip notes-tag-filter${isActive ? ' is-active' : ''}" data-tag="${esc(name)}" style="font-size:${size}rem">#${esc(name)}<span class="notes-tag-count">${count}</span></button>`;
+      }).join('');
+
+    ['notesTagCloud', 'notesCardsTagCloud'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.innerHTML = html;
+      bindTagFilters(el);
+    });
+  }
+
+  async function loadTagCloud() {
+    try {
+      const meta = await api('/api/notes/meta.php');
+      tagCloud = Array.isArray(meta.tags) ? meta.tags : [];
+      renderTagClouds();
+    } catch {
+      /* ignore cloud refresh errors */
+    }
   }
 
   function syncVisibilityUi() {
@@ -497,6 +538,7 @@
     if (viewMode === 'cards') renderCards();
     else renderList();
     highlightSelection();
+    renderTagClouds();
   }
 
   async function loadNotes(q = '') {
@@ -525,6 +567,7 @@
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
       loadNotes(String(q).trim()).catch((err) => toast(err.message, true));
+      renderTagClouds();
     }, 250);
   }
   document.getElementById('notesSearch').addEventListener('input', onSearchInput);
@@ -632,6 +675,7 @@
         toast('Note created');
       }
       await loadNotes(getSearchQuery());
+      await loadTagCloud();
       selectedId = saved.id;
       showEditorFor(saved.id);
     } catch (err) {
@@ -647,6 +691,7 @@
       toast('Note deleted');
       selectedId = null;
       await loadNotes(getSearchQuery());
+      await loadTagCloud();
       if (viewMode === 'list') showEmpty();
       else {
         document.getElementById('notesEditorPane').classList.add('hidden');
@@ -661,8 +706,10 @@
     try {
       const meta = await api('/api/notes/meta.php');
       groups = meta.groups || [];
+      tagCloud = Array.isArray(meta.tags) ? meta.tags : [];
       setView(getView());
       await loadNotes();
+      renderTagClouds();
       showEmpty();
     } catch (err) {
       toast(err.message, true);

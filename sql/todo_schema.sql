@@ -27,6 +27,19 @@ CREATE TABLE IF NOT EXISTS task_groups (
     FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS task_tags (
+    task_id INTEGER NOT NULL,
+    tag_id INTEGER NOT NULL,
+    PRIMARY KEY (task_id, tag_id),
+    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+    FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+);
+
 CREATE INDEX IF NOT EXISTS idx_tasks_owner ON tasks(owner_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON tasks(assignee_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
@@ -34,3 +47,4 @@ CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(due_date);
 CREATE INDEX IF NOT EXISTS idx_tasks_updated ON tasks(updated_at);
 CREATE INDEX IF NOT EXISTS idx_tasks_visibility ON tasks(visibility);
 CREATE INDEX IF NOT EXISTS idx_tasks_archived ON tasks(archived);
+CREATE INDEX IF NOT EXISTS idx_task_tags_tag ON task_tags(tag_id);

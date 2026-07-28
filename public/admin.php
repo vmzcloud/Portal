@@ -354,8 +354,15 @@ if ($teamcalLocationsJson === false) {
         </label>
         <div class="form-hint">When disabled, the Todo link and kanban board are hidden. Default is off. Assign tasks, track To do / In progress / Done.</div>
       </div>
-      <div class="form-actions" style="justify-content:flex-start;margin-bottom:8px">
+      <div class="form-actions" style="justify-content:flex-start;margin-bottom:18px">
         <button type="button" class="btn btn-primary" id="todoSaveEnabled">Save setting</button>
+      </div>
+      <hr style="border:0;border-top:1px solid var(--border);margin:8px 0 18px">
+      <h3 style="margin:0 0 10px;font-size:1rem">Task viewers</h3>
+      <p class="form-hint" style="margin-top:0">Task viewers can open any user’s board <strong>read-only</strong> (View as). They still create and edit only their own tasks.</p>
+      <div class="checkbox-list" id="todoTaskViewers" style="max-height:240px;overflow:auto;margin-bottom:12px"></div>
+      <div class="form-actions" style="justify-content:flex-start;margin-bottom:8px">
+        <button type="button" class="btn btn-primary" id="todoSaveViewers">Save task viewers</button>
       </div>
     </section>
   </div>

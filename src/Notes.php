@@ -577,27 +577,76 @@ final class Notes
         );
         $rows = $stmt->fetchAll();
         $userMap = TeamCal::portalUserMap();
-        $q = mb_strtolower(trim($q));
-        if (str_starts_with($q, '#')) {
-            $q = ltrim($q, '#');
-        }
+        $q = trim($q);
         $out = [];
         foreach ($rows as $row) {
             $note = self::enrichNote($row, $userMap);
             if (!self::canViewNote($note, $user, $userGroupIds)) {
                 continue;
             }
-            if ($q !== '') {
-                $tags = is_array($note['tags'] ?? null) ? implode(' ', $note['tags']) : '';
-                $hay = mb_strtolower(
-                    $note['title'] . ' ' . $note['preview'] . ' ' . strip_tags($note['body_html']) . ' ' . $tags
-                );
-                if (!str_contains($hay, $q)) {
-                    continue;
-                }
+            if ($q !== '' && !self::matchesQuery($note, $q)) {
+                continue;
             }
             $note['can_edit'] = self::canEditNote($note, $user);
             $out[] = $note;
+        }
+        return $out;
+    }
+
+    public static function matchesQuery(array $note, string $q): bool
+    {
+        $tags = is_array($note['tags'] ?? null) ? $note['tags'] : [];
+        $bodyPlain = html_entity_decode(
+            strip_tags((string) ($note['body_html'] ?? '')),
+            ENT_QUOTES | ENT_HTML5,
+            'UTF-8'
+        );
+        $fields = [
+            (string) ($note['title'] ?? ''),
+            (string) ($note['preview'] ?? ''),
+            $bodyPlain,
+            (string) ($note['owner_name'] ?? ''),
+        ];
+        return SearchQuery::matches($q, $fields, $tags, static fn (string $raw) => self::normalizeTagName($raw));
+    }
+
+    /**
+     * Tag usage among all notes visible to the user (ignores search filter).
+     *
+     * @return list<array{name:string,count:int}>
+     */
+    public static function tagCloud(array $user, array $userGroupIds, int $limit = 40): array
+    {
+        $stmt = self::pdo()->query('SELECT * FROM notes ORDER BY id DESC');
+        $rows = $stmt->fetchAll();
+        $userMap = TeamCal::portalUserMap();
+        $counts = [];
+        foreach ($rows as $row) {
+            $note = self::enrichNote($row, $userMap);
+            if (!self::canViewNote($note, $user, $userGroupIds)) {
+                continue;
+            }
+            $tags = is_array($note['tags'] ?? null) ? $note['tags'] : [];
+            foreach ($tags as $t) {
+                $name = (string) $t;
+                if ($name === '') {
+                    continue;
+                }
+                $counts[$name] = ($counts[$name] ?? 0) + 1;
+            }
+        }
+        $out = [];
+        foreach ($counts as $name => $count) {
+            $out[] = ['name' => $name, 'count' => (int) $count];
+        }
+        usort($out, static function (array $a, array $b): int {
+            if ($a['count'] !== $b['count']) {
+                return $b['count'] <=> $a['count'];
+            }
+            return strcasecmp($a['name'], $b['name']);
+        });
+        if ($limit > 0 && count($out) > $limit) {
+            $out = array_slice($out, 0, $limit);
         }
         return $out;
     }

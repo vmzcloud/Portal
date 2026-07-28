@@ -160,6 +160,7 @@ if ($method === 'DELETE') {
         $todoAffected = Todo::countByOwner($id);
     }
     $todoAssigneeCleared = Todo::clearAssignee($id);
+    Todo::removeTaskViewer($id);
 
     $privateEventsDeleted = TeamCal::deletePrivateEventsByOwner($id);
     $personLinksRemoved = TeamCal::removePersonFromAllEvents($id);

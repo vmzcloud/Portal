@@ -6,6 +6,7 @@ error_reporting(E_ALL);
 ini_set('display_errors', '0');
 
 require_once __DIR__ . '/Database.php';
+require_once __DIR__ . '/SearchQuery.php';
 require_once __DIR__ . '/TeamCalDatabase.php';
 require_once __DIR__ . '/TeamCal.php';
 require_once __DIR__ . '/IcsParser.php';

@@ -62,14 +62,22 @@ $isAdmin = Auth::isAdmin();
 
   <main class="todo-main">
     <div class="todo-toolbar">
-      <input class="form-control todo-search" id="todoSearch" type="search" placeholder="Search tasks…">
+      <input class="form-control todo-search" id="todoSearch" type="search" placeholder='Search…  #urgent AND api  ·  foo OR bar' title="AND / OR / #tag / &quot;phrase&quot; / parentheses">
       <select class="form-control todo-filter" id="todoFilter" aria-label="Filter">
         <option value="">All visible</option>
         <option value="mine">Created by me</option>
         <option value="assigned">Assigned to me</option>
       </select>
+      <label class="todo-view-as-wrap hidden" id="todoViewAsWrap">
+        <span class="todo-view-as-label">View as</span>
+        <select class="form-control todo-view-as" id="todoViewAs" aria-label="View as user">
+          <option value="me">Me</option>
+          <option value="all">All users</option>
+        </select>
+      </label>
       <button type="button" class="btn btn-sm hidden" id="btnArchiveAllDone" title="Archive all done tasks you can manage">Archive done</button>
     </div>
+    <div class="todo-banner hidden" id="todoViewBanner"></div>
 
     <div class="todo-board" id="todoBoard">
       <section class="todo-column" data-status="todo">
@@ -116,6 +124,13 @@ $isAdmin = Auth::isAdmin();
         <div class="form-group">
           <label for="taskDescription">Description</label>
           <textarea class="form-control" id="taskDescription" rows="4" maxlength="5000"></textarea>
+        </div>
+        <div class="form-group">
+          <label for="taskTagInput">Hashtags</label>
+          <div class="todo-tags-input" id="taskTags">
+            <div class="todo-tags-chips" id="taskTagsChips"></div>
+            <input class="todo-tags-field" id="taskTagInput" type="text" maxlength="40" placeholder="Add #tag…" autocomplete="off">
+          </div>
         </div>
         <div class="form-row">
           <div class="form-group">

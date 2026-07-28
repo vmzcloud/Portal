@@ -233,7 +233,8 @@ Optional personal/shared notes (`/notes.php`). **Off by default.** **Login users
 
 - **List** view (default): sidebar of notes + main editor  
 - **Cards** view: card grid with its own search bar; click a card opens the editor overlay  
-- **Search** (list and cards): filters by title, body, and hashtags (`work` or `#work`)  
+- **Search** (list and cards): multi-condition `AND` / `OR` (same syntax as Todo), `#tag`, `"phrase"`, parentheses  
+- **Tag cloud** under the search bar (list + cards): sized by usage among notes you can see; click to filter `#tag`  
 - Click a hashtag chip on a note to filter by that tag  
 - Search query stays in sync when switching list ↔ cards  
 - View mode remembered in the browser  
@@ -277,8 +278,15 @@ Optional task board (`/todo.php`). **Off by default.** **Login users only.**
 - Status: `todo` / `in_progress` / `done`  
 - Optional **due date** (overdue highlighted)  
 - Optional single **assignee**  
+- **Hashtags** (up to 20; same rules as Notes) — click a chip to filter  
 - Visibility: **private** (owner + assignee + admin) or **share** (selected groups + owner + assignee + admin)  
 - **Archived** flag (separate from status; only done tasks)  
+
+**Search**
+
+- Multi-condition: space or `AND` = all must match; `OR` = either; `AND` tighter than `OR`  
+- `#tag` matches that hashtag; plain text matches title/description/people/tags  
+- `"exact phrase"`, parentheses: `(api OR graphql) AND #bug`  
 
 **Permissions**
 
@@ -288,11 +296,20 @@ Optional task board (`/todo.php`). **Off by default.** **Login users only.**
 | Edit fields / delete | Owner, admin |
 | Change status | Owner, assignee, admin |
 | Archive / unarchive | Owner, assignee, admin |
+| Task viewer (read all boards) | Users assigned in Admin → Todo |
+| Edit others’ tasks as viewer | — (read-only; own tasks still editable) |
+
+**Task viewers**
+
+1. Admin → **Todo** → check users under **Task viewers** → **Save task viewers**  
+2. Those users see a **View as** control: Me / All users / pick a user  
+3. Viewing another user shows tasks they **own or are assigned to** (read-only except the viewer’s own tasks)
 
 **Storage**
 
 - `data/todo.db` (separate SQLite DB)  
 - Schema reference: `sql/todo_schema.sql`  
+- Task viewer ids stored in settings key `task_viewers`  
 
 ### Authentication
 
@@ -330,7 +347,7 @@ Optional task board (`/todo.php`). **Off by default.** **Login users only.**
   - Admins can list/manage events even when Team Calendar is disabled  
 - **Team Calendar** settings: enable toggle, period ranges, types/locations JSON editors, holiday ICS  
 - **Notes**: enable / disable toggle only  
-- **Todo**: enable / disable toggle only  
+- **Todo**: enable / disable toggle; **Task viewers** multi-select  
 
 ### UI chrome
 
@@ -363,8 +380,9 @@ Optional task board (`/todo.php`). **Off by default.** **Login users only.**
 | Enable Notes | — | — | ✓ |
 | Open Todo (when enabled) | — | ✓ | ✓ |
 | Create tasks / edit own / status if assignee | — | ✓ | ✓ |
+| View all users’ tasks (read-only) | — | if task viewer | ✓ |
 | Edit/delete any task | — | — | ✓ |
-| Enable Todo | — | — | ✓ |
+| Enable Todo / assign task viewers | — | — | ✓ |
 
 ## Data & files
 
@@ -428,6 +446,7 @@ Portal/
 ├── src/
 │   ├── Auth.php
 │   ├── Database.php        # portal.db
+│   ├── SearchQuery.php     # shared AND/OR search (Notes + Todo)
 │   ├── TeamCal.php
 │   ├── TeamCalDatabase.php # teamcal.db
 │   ├── Notes.php

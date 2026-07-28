@@ -39,6 +39,78 @@ final class Todo
         }
     }
 
+    /** @return list<int> */
+    public static function getTaskViewerIds(): array
+    {
+        $raw = self::getSetting('task_viewers', '[]');
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return [];
+        }
+        $ids = [];
+        foreach ($decoded as $id) {
+            $n = (int) $id;
+            if ($n > 0) {
+                $ids[$n] = $n;
+            }
+        }
+        return array_values($ids);
+    }
+
+    /**
+     * @param list<int|string> $ids
+     * @return list<int>
+     */
+    public static function setTaskViewerIds(array $ids): array
+    {
+        $userMap = TeamCal::portalUserMap();
+        $clean = [];
+        foreach ($ids as $id) {
+            $n = (int) $id;
+            if ($n > 0 && isset($userMap[$n])) {
+                $clean[$n] = $n;
+            }
+        }
+        $list = array_values($clean);
+        self::setSetting('task_viewers', json_encode($list, JSON_UNESCAPED_UNICODE));
+        return $list;
+    }
+
+    public static function isTaskViewer(?array $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+        $uid = (int) ($user['id'] ?? 0);
+        if ($uid <= 0) {
+            return false;
+        }
+        return in_array($uid, self::getTaskViewerIds(), true);
+    }
+
+    public static function canViewAllTasks(?array $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+        if (($user['role'] ?? '') === 'admin') {
+            return true;
+        }
+        return self::isTaskViewer($user);
+    }
+
+    public static function removeTaskViewer(int $userId): void
+    {
+        if ($userId <= 0) {
+            return;
+        }
+        $ids = array_values(array_filter(
+            self::getTaskViewerIds(),
+            static fn (int $id) => $id !== $userId
+        ));
+        self::setSetting('task_viewers', json_encode($ids, JSON_UNESCAPED_UNICODE));
+    }
+
     public static function normalizeStatus(string $raw): ?string
     {
         $s = strtolower(trim($raw));
@@ -87,13 +159,106 @@ final class Todo
         }
     }
 
-    public static function canViewTask(array $task, ?array $user, array $userGroupIds): bool
+    public static function normalizeTagName(string $raw): ?string
+    {
+        $name = mb_strtolower(trim($raw));
+        if (str_starts_with($name, '#')) {
+            $name = ltrim($name, '#');
+        }
+        $name = trim($name);
+        if ($name === '' || mb_strlen($name) > 40) {
+            return null;
+        }
+        if (!preg_match('/^[a-z0-9][a-z0-9_-]*$/u', $name)) {
+            return null;
+        }
+        return $name;
+    }
+
+    /**
+     * @param list<mixed> $raw
+     * @return list<string>
+     */
+    public static function normalizeTagList(array $raw): array
+    {
+        $out = [];
+        foreach ($raw as $item) {
+            if (!is_string($item) && !is_numeric($item)) {
+                continue;
+            }
+            $name = self::normalizeTagName((string) $item);
+            if ($name === null) {
+                continue;
+            }
+            $out[$name] = $name;
+            if (count($out) >= 20) {
+                break;
+            }
+        }
+        return array_values($out);
+    }
+
+    /** @return list<string> */
+    public static function fetchTags(int $taskId): array
+    {
+        $stmt = self::pdo()->prepare(
+            'SELECT t.name FROM tags t
+             INNER JOIN task_tags tt ON tt.tag_id = t.id
+             WHERE tt.task_id = ?
+             ORDER BY t.name COLLATE NOCASE'
+        );
+        $stmt->execute([$taskId]);
+        return array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
+
+    /**
+     * @param list<string> $names Already normalized tag names
+     */
+    public static function syncTags(int $taskId, array $names): void
+    {
+        $pdo = self::pdo();
+        $pdo->prepare('DELETE FROM task_tags WHERE task_id = ?')->execute([$taskId]);
+        if ($names === []) {
+            return;
+        }
+
+        $find = $pdo->prepare('SELECT id FROM tags WHERE name = ?');
+        $create = $pdo->prepare('INSERT INTO tags (name) VALUES (?)');
+        $link = $pdo->prepare('INSERT OR IGNORE INTO task_tags (task_id, tag_id) VALUES (?, ?)');
+
+        foreach ($names as $name) {
+            $find->execute([$name]);
+            $tagId = $find->fetchColumn();
+            if ($tagId === false) {
+                $create->execute([$name]);
+                $tagId = (int) $pdo->lastInsertId();
+            } else {
+                $tagId = (int) $tagId;
+            }
+            $link->execute([$taskId, $tagId]);
+        }
+    }
+
+    /**
+     * Evaluate AND/OR search query against a task.
+     */
+    public static function matchesQuery(array $task, string $q): bool
+    {
+        $tags = is_array($task['tags'] ?? null) ? $task['tags'] : [];
+        $fields = [
+            (string) ($task['title'] ?? ''),
+            (string) ($task['description'] ?? ''),
+            (string) ($task['owner_name'] ?? ''),
+            (string) ($task['assignee_name'] ?? ''),
+        ];
+        return SearchQuery::matches($q, $fields, $tags, static fn (string $raw) => self::normalizeTagName($raw));
+    }
+
+    /** Personal board rules (owner / assignee / share). Does not include task-viewer override. */
+    public static function canViewTaskPersonal(array $task, ?array $user, array $userGroupIds): bool
     {
         if (!$user) {
             return false;
-        }
-        if (($user['role'] ?? '') === 'admin') {
-            return true;
         }
         $uid = (int) $user['id'];
         if ((int) ($task['owner_id'] ?? 0) === $uid) {
@@ -115,6 +280,17 @@ final class Todo
             }
         }
         return false;
+    }
+
+    public static function canViewTask(array $task, ?array $user, array $userGroupIds): bool
+    {
+        if (!$user) {
+            return false;
+        }
+        if (self::canViewAllTasks($user)) {
+            return true;
+        }
+        return self::canViewTaskPersonal($task, $user, $userGroupIds);
     }
 
     public static function canEditTask(array $task, ?array $user): bool
@@ -195,6 +371,7 @@ final class Todo
         $archivedAt = $row['archived_at'] ?? null;
         $row['archived_at'] = $archivedAt !== null && $archivedAt !== '' ? (string) $archivedAt : null;
         $row['group_ids'] = self::fetchGroupIds($id);
+        $row['tags'] = self::fetchTags($id);
 
         if ($userMap === null) {
             $userMap = TeamCal::portalUserMap();
@@ -219,6 +396,8 @@ final class Todo
     }
 
     /**
+     * @param int|null $viewUserId null = personal/default visibility only (no view-as);
+     *                             0 = all tasks (viewers/admins); >0 = owner or assignee is that user
      * @return list<array>
      */
     public static function listVisibleTasks(
@@ -227,7 +406,8 @@ final class Todo
         string $q = '',
         ?string $status = null,
         string $filter = '',
-        bool $archivedOnly = false
+        bool $archivedOnly = false,
+        ?int $viewUserId = null
     ): array {
         if ($archivedOnly) {
             $sql = 'SELECT * FROM tasks WHERE archived = 1 ORDER BY
@@ -243,15 +423,32 @@ final class Todo
         }
         $rows = self::pdo()->query($sql)->fetchAll();
         $userMap = TeamCal::portalUserMap();
-        $q = mb_strtolower(trim($q));
+        $q = trim($q);
         $filter = strtolower(trim($filter));
         $uid = (int) $user['id'];
+        $canViewAll = self::canViewAllTasks($user);
         $out = [];
         foreach ($rows as $row) {
             $task = self::enrichTask($row, $userMap);
-            if (!self::canViewTask($task, $user, $userGroupIds)) {
+
+            // View-as mode (admin / task viewer only): all tasks or one user's owned/assigned
+            if ($viewUserId !== null) {
+                if (!$canViewAll) {
+                    continue;
+                }
+                if ($viewUserId > 0) {
+                    $ownerMatch = (int) $task['owner_id'] === $viewUserId;
+                    $assigneeMatch = $task['assignee_id'] !== null && (int) $task['assignee_id'] === $viewUserId;
+                    if (!$ownerMatch && !$assigneeMatch) {
+                        continue;
+                    }
+                }
+                // viewUserId === 0 → all tasks
+            } elseif (!self::canViewTaskPersonal($task, $user, $userGroupIds)) {
+                // Default "Me" board: personal visibility only (even for admin / task viewer)
                 continue;
             }
+
             if ($status !== null && $status !== '' && $task['status'] !== $status) {
                 continue;
             }
@@ -264,14 +461,8 @@ final class Todo
                     continue;
                 }
             }
-            if ($q !== '') {
-                $hay = mb_strtolower(
-                    $task['title'] . ' ' . $task['description'] . ' '
-                    . ($task['owner_name'] ?? '') . ' ' . ($task['assignee_name'] ?? '')
-                );
-                if (!str_contains($hay, $q)) {
-                    continue;
-                }
+            if ($q !== '' && !self::matchesQuery($task, $q)) {
+                continue;
             }
             $task['can_edit'] = self::canEditTask($task, $user) && !$task['archived'];
             $task['can_status'] = self::canChangeStatus($task, $user);

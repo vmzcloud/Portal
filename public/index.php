@@ -39,13 +39,13 @@ $todoEnabled = Todo::isEnabled();
     <div class="header-actions">
       <button type="button" class="btn btn-sm btn-ghost" id="themeToggle" aria-label="Toggle theme" title="Theme">☀</button>
       <?php if ($teamcalEnabled): ?>
-        <a class="btn btn-sm" href="/calendar.php">Calendar</a>
+        <a class="btn btn-sm btn-app btn-app-cal" href="/calendar.php">Calendar</a>
       <?php endif; ?>
       <?php if ($notesEnabled && $user): ?>
-        <a class="btn btn-sm" href="/notes.php">Notes</a>
+        <a class="btn btn-sm btn-app btn-app-notes" href="/notes.php">Notes</a>
       <?php endif; ?>
       <?php if ($todoEnabled && $user): ?>
-        <a class="btn btn-sm" href="/todo.php">Todo</a>
+        <a class="btn btn-sm btn-app btn-app-todo" href="/todo.php">Todo</a>
       <?php endif; ?>
       <?php if ($user): ?>
         <button type="button" class="btn btn-sm" id="btnAddBookmark">+ Bookmark</button>

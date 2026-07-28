@@ -27,7 +27,7 @@ if ($method === 'GET') {
         $groups = $stmt->fetchAll();
     }
 
-    json_ok([
+    $data = [
         'enabled' => Todo::isEnabled(),
         'statuses' => Todo::STATUSES,
         'users' => TeamCal::activePortalUsers(),
@@ -35,7 +35,13 @@ if ($method === 'GET') {
             'id' => (int) $g['id'],
             'name' => (string) $g['name'],
         ], $groups),
-    ]);
+        'is_task_viewer' => Todo::isTaskViewer($user),
+        'can_view_all' => Todo::canViewAllTasks($user),
+    ];
+    if (Auth::isAdmin()) {
+        $data['task_viewer_ids'] = Todo::getTaskViewerIds();
+    }
+    json_ok($data);
 }
 
 json_error('Method not allowed', 405);

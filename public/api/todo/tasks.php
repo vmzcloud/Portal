@@ -16,7 +16,8 @@ $pdo = Todo::pdo();
  *   due_date: ?string,
  *   assignee_id: ?int,
  *   visibility: string,
- *   group_ids: list<int>
+ *   group_ids: list<int>,
+ *   tags: list<string>
  * }
  */
 function todo_validate_payload(array $body, bool $requireTitle = true): array
@@ -81,6 +82,12 @@ function todo_validate_payload(array $body, bool $requireTitle = true): array
         $groupIds = [];
     }
 
+    $rawTags = $body['tags'] ?? [];
+    if (!is_array($rawTags)) {
+        $rawTags = [];
+    }
+    $tags = Todo::normalizeTagList($rawTags);
+
     return [
         'title' => $title,
         'description' => $description,
@@ -89,6 +96,7 @@ function todo_validate_payload(array $body, bool $requireTitle = true): array
         'assignee_id' => $assigneeId,
         'visibility' => $visibility,
         'group_ids' => $groupIds,
+        'tags' => $tags,
     ];
 }
 
@@ -127,7 +135,38 @@ if ($method === 'GET') {
     $archivedOnly = isset($_GET['archived']) && (
         $_GET['archived'] === '1' || $_GET['archived'] === 'true' || $_GET['archived'] === 'yes'
     );
-    $list = Todo::listVisibleTasks($user, $userGroupIds, $q, $statusParam, $filter, $archivedOnly);
+
+    $viewUserId = null;
+    if (isset($_GET['view_user_id'])) {
+        if (!Todo::canViewAllTasks($user)) {
+            json_error('Permission denied', 403);
+        }
+        $rawView = strtolower(trim((string) $_GET['view_user_id']));
+        if ($rawView === '' || $rawView === 'me') {
+            $viewUserId = null;
+        } elseif ($rawView === 'all') {
+            $viewUserId = 0;
+        } else {
+            $viewUserId = (int) $rawView;
+            if ($viewUserId <= 0) {
+                json_error('Invalid view_user_id');
+            }
+            $userMap = TeamCal::portalUserMap();
+            if (!isset($userMap[$viewUserId])) {
+                json_error('View user not found', 404);
+            }
+        }
+    }
+
+    $list = Todo::listVisibleTasks(
+        $user,
+        $userGroupIds,
+        $q,
+        $statusParam,
+        $filter,
+        $archivedOnly,
+        $viewUserId
+    );
     json_ok($list);
 }
 
@@ -158,6 +197,7 @@ if ($method === 'POST') {
     ]);
     $id = (int) $pdo->lastInsertId();
     Todo::syncGroups($id, $data['group_ids']);
+    Todo::syncTags($id, $data['tags']);
 
     $task = Todo::loadTask($id);
     $task['can_edit'] = true;
@@ -264,6 +304,7 @@ if ($method === 'PUT' || $method === 'PATCH') {
         'assignee_id' => array_key_exists('assignee_id', $body) ? $body['assignee_id'] : $existing['assignee_id'],
         'visibility' => $body['visibility'] ?? $existing['visibility'],
         'group_ids' => $body['group_ids'] ?? $existing['group_ids'],
+        'tags' => $body['tags'] ?? $existing['tags'] ?? [],
     ];
     $data = todo_validate_payload($merged, true);
 
@@ -281,6 +322,7 @@ if ($method === 'PUT' || $method === 'PATCH') {
         $id,
     ]);
     Todo::syncGroups($id, $data['group_ids']);
+    Todo::syncTags($id, $data['tags']);
 
     $task = Todo::loadTask($id);
     json_ok(todo_task_flags($task, $user));
